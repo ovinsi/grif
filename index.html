@@ -1,0 +1,1166 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Тренажёр Гриф</title>
+<meta name="theme-color" content="#121614">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Гриф">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=Unbounded:wght@600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Мобильное приложение одной колонкой: вид сверху, нижняя панель вкладок, урок на весь экран.
+   Палитра от грифа: тёмный палисандр, патина струн, латунь ладов. */
+:root{
+  --bg:#F1F3EF; --surface:#FFFFFF; --surface-2:#E7EBE5; --fg:#18201C; --muted:#5E6A63; --line:#D5DBD3;
+  --accent:#0E7C66; --accent-ink:#FFFFFF; --hit:#24934E; --miss:#C9402F; --gold:#C98A12;
+  --s1:#E0583A; --s2:#C98A12; --s3:#13907C; --s4:#3A73C9; --s5:#8457C2; --s6:#BD4478;
+  --f-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --f-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --r:14px; color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#111513; --surface:#1A201D; --surface-2:#232B27; --fg:#E8EEEA; --muted:#93A098; --line:#2C3530;
+  --accent:#3FC19F; --accent-ink:#06231C; --hit:#4BC879; --miss:#F06B5C; --gold:#F0B43C;
+  --s1:#F37352; --s2:#F0B43C; --s3:#3FC19F; --s4:#6AA0F0; --s5:#AE86EA; --s6:#E46FA2; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111513; --surface:#1A201D; --surface-2:#232B27; --fg:#E8EEEA; --muted:#93A098; --line:#2C3530;
+  --accent:#3FC19F; --accent-ink:#06231C; --hit:#4BC879; --miss:#F06B5C; --gold:#F0B43C;
+  --s1:#F37352; --s2:#F0B43C; --s3:#3FC19F; --s4:#6AA0F0; --s5:#AE86EA; --s6:#E46FA2; color-scheme:dark}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:400 16px/1.45 var(--f-body);-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3{margin:0;text-wrap:balance}
+p{margin:0}
+
+.app{max-width:560px;margin:0 auto;min-height:100%;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+.top{display:flex;align-items:center;justify-content:space-between;padding-block:14px 6px}
+.brand{font:700 20px/1 var(--f-display);letter-spacing:.02em;display:flex;align-items:center;gap:10px}
+.brand-mark{width:26px;height:26px;border-radius:7px;background:var(--accent);display:grid;place-items:center}
+.brand-mark svg{width:16px;height:16px}
+.icon-btn{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;color:var(--muted)}
+.icon-btn:active{background:var(--surface-2)}
+.icon-btn svg{width:22px;height:22px}
+
+.view{display:flex;flex-direction:column;gap:18px;padding-block:8px 24px}
+.eyebrow{font:600 12px/1 var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.h1{font:700 26px/1.15 var(--f-display)}
+.sub{color:var(--muted)}
+
+/* Сегодня */
+.day{display:flex;gap:16px;align-items:center;background:var(--surface);border-radius:var(--r);padding:16px}
+.ring{width:84px;height:84px;flex:none}
+.ring circle{fill:none;stroke-width:9}
+.ring .bgc{stroke:var(--surface-2)}
+.ring .fgc{stroke:var(--accent);stroke-linecap:round;transform:rotate(-90deg);transform-origin:50% 50%;transition:stroke-dashoffset .6s}
+.ring text{font:700 20px var(--f-mono);fill:var(--fg)}
+.day-info{display:flex;flex-direction:column;gap:4px;min-width:0}
+.day-info b{font:600 17px var(--f-body)}
+.streak{display:inline-flex;gap:6px;align-items:center;font:500 14px var(--f-body);color:var(--muted)}
+.streak b{color:var(--gold);font:700 14px var(--f-mono)}
+
+.plan{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px;counter-reset:p}
+.pi{display:flex;align-items:center;gap:14px;background:var(--surface);border-radius:var(--r);padding:14px;counter-increment:p;width:100%;text-align:left}
+.pi:active{transform:scale(.99)}
+.pi-n{width:34px;height:34px;flex:none;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font:700 14px var(--f-mono);color:var(--muted)}
+.pi-n::before{content:counter(p)}
+.pi.done .pi-n{background:var(--hit);border-color:var(--hit);color:var(--accent-ink)}
+.pi.done .pi-n::before{content:"✓"}
+.pi-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.pi-label{font:600 12px var(--f-body);letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+.pi-title{font:600 16px var(--f-body)}
+.pi-sub{font-size:14px;color:var(--muted)}
+.pi-min{font:500 13px var(--f-mono);color:var(--muted);flex:none}
+.pi.done .pi-title{color:var(--muted)}
+
+/* Уроки */
+.stage{display:flex;flex-direction:column;gap:10px}
+.stage-head{display:flex;gap:12px;align-items:baseline}
+.stage-num{font:700 30px/1 var(--f-display);color:var(--accent);min-width:28px}
+.stage.soon .stage-num{color:var(--line)}
+.stage-head h3{font:600 18px var(--f-body)}
+.stage-head p{font-size:14px;color:var(--muted)}
+.lessons{display:flex;flex-direction:column;gap:8px}
+.li{display:flex;align-items:center;gap:12px;background:var(--surface);border-radius:12px;padding:12px 14px;width:100%;text-align:left}
+.li[disabled]{opacity:.5;cursor:default}
+.li-body{flex:1;min-width:0}
+.li-title{font:600 15px var(--f-body);display:block}
+.li-sub{font-size:13px;color:var(--muted);display:block}
+.li-mode{font:500 11px var(--f-mono);letter-spacing:.04em;padding:3px 7px;border-radius:6px;background:var(--surface-2);color:var(--muted);flex:none}
+.stars{display:inline-flex;gap:2px;flex:none}
+.stars svg{width:15px;height:15px;fill:var(--line)}
+.stars svg.on{fill:var(--gold)}
+.lock{width:16px;height:16px;color:var(--muted);flex:none}
+.soon-note{font-size:14px;color:var(--muted);background:var(--surface);border-radius:12px;padding:12px 14px;border:1px dashed var(--line)}
+
+/* Тюнер */
+.tuner{background:var(--surface);border-radius:var(--r);padding:20px 16px;display:flex;flex-direction:column;align-items:center;gap:14px}
+.t-note{font:700 64px/1 var(--f-display);min-height:64px}
+.t-note small{font:500 18px var(--f-mono);color:var(--muted);margin-left:6px}
+.t-hz{font:500 14px var(--f-mono);color:var(--muted)}
+.gauge{width:100%;max-width:360px;height:auto}
+.gauge .tick{stroke:var(--line);stroke-width:2}
+.gauge .tick.mid{stroke:var(--accent);stroke-width:3}
+.gauge .needle{stroke:var(--fg);stroke-width:4;stroke-linecap:round;transition:transform .12s linear;transform-origin:180px 150px}
+.gauge .hub{fill:var(--fg)}
+.gauge text{font:500 12px var(--f-mono);fill:var(--muted)}
+.t-state{font:600 16px var(--f-body);min-height:22px}
+.t-state.ok{color:var(--hit)}
+.t-state.low,.t-state.high{color:var(--gold)}
+.strings{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;width:100%}
+.str{padding:10px 0;border-radius:10px;background:var(--surface-2);display:flex;flex-direction:column;align-items:center;gap:2px}
+.str b{font:700 17px var(--f-mono)}
+.str span{font-size:11px;color:var(--muted)}
+.str.on{background:var(--accent);color:var(--accent-ink)}
+.str.on span{color:var(--accent-ink)}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:50px;padding:0 22px;border-radius:14px;font:600 16px var(--f-body);background:var(--surface-2)}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn:disabled{opacity:.45}
+.btn svg{width:18px;height:18px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row .btn{flex:1}
+.mic-msg{font-size:14px;color:var(--miss);text-align:center}
+.hint{font-size:14px;color:var(--muted)}
+
+/* Метроном */
+.metro{background:var(--surface);border-radius:var(--r);padding:22px 16px;display:flex;flex-direction:column;align-items:center;gap:18px}
+.bpm{display:flex;align-items:center;gap:18px}
+.bpm-val{font:700 64px/1 var(--f-mono);min-width:3ch;text-align:center;font-variant-numeric:tabular-nums}
+.bpm-unit{font:500 13px var(--f-mono);color:var(--muted);text-align:center;margin-top:-10px}
+.round{width:52px;height:52px;border-radius:50%;background:var(--surface-2);font:700 24px var(--f-mono)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.beats{display:flex;gap:10px}
+.beat{width:18px;height:18px;border-radius:50%;background:var(--surface-2);transition:background .05s}
+.beat.on{background:var(--accent)}
+.beat.on.first{background:var(--gold)}
+.seg{display:inline-flex;background:var(--surface-2);border-radius:12px;padding:3px}
+.seg button{padding:8px 14px;border-radius:9px;font:600 14px var(--f-mono)}
+.seg button[aria-pressed=true]{background:var(--surface);box-shadow:0 1px 2px rgb(0 0 0 / .12)}
+
+/* Нижние вкладки */
+.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);z-index:5}
+.tabs-in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)}
+.tab{display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 0 8px;font:500 12px var(--f-body);color:var(--muted)}
+.tab svg{width:24px;height:24px}
+.tab[aria-current=page]{color:var(--accent)}
+
+/* Плеер урока */
+.player{position:fixed;inset:0;background:var(--bg);z-index:20;display:flex;flex-direction:column;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+  padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+.p-in{max-width:760px;width:100%;margin:0 auto;flex:1;display:flex;flex-direction:column;gap:12px;
+  padding-left:16px;padding-right:16px;padding-block:6px 14px;min-height:0}
+.p-head{display:flex;align-items:center;gap:8px}
+.p-title{flex:1;min-width:0}
+.p-title b{font:600 17px var(--f-body);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.p-title span{font-size:13px;color:var(--muted)}
+.p-tip{font-size:15px;background:var(--surface);border-radius:12px;padding:12px 14px}
+.hw-wrap{position:relative;background:var(--surface);border-radius:var(--r);overflow:hidden;flex:1;min-height:170px;max-height:300px}
+#hw{display:block;width:100%;height:100%}
+.count{position:absolute;inset:0;display:grid;place-items:center;font:700 72px var(--f-display);color:var(--accent);pointer-events:none}
+.p-info{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.target{display:flex;flex-direction:column;gap:2px;min-width:0}
+.target b{font:600 18px var(--f-body)}
+.target span{font-size:13px;color:var(--muted)}
+.hear{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:none}
+.hear-n{font:700 15px var(--f-mono)}
+.hear-n.good{color:var(--hit)} .hear-n.bad{color:var(--miss)}
+.meter{width:76px;height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden}
+.meter i{display:block;height:100%;width:0;background:var(--accent)}
+#fb{display:block;width:100%;height:96px;background:var(--surface);border-radius:12px}
+.p-ctrl{display:flex;gap:10px}
+.p-ctrl .btn{flex:1}
+.toggle{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted)}
+.toggle input{width:20px;height:20px;accent-color:var(--accent)}
+.p-meta{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.score{font:500 14px var(--f-mono);color:var(--muted)}
+
+.result{position:absolute;inset:0;background:color-mix(in srgb,var(--bg) 92%,transparent);display:grid;place-items:center;z-index:2;padding:16px}
+.r-card{background:var(--surface);border-radius:20px;padding:26px 20px;max-width:380px;width:100%;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center}
+.r-stars{display:flex;gap:8px}
+.r-stars svg{width:46px;height:46px;fill:var(--line)}
+.r-stars svg.on{fill:var(--gold)}
+.r-pct{font:700 40px var(--f-mono)}
+.r-txt{color:var(--muted)}
+.r-card .btn{width:100%}
+
+/* Настройки */
+.sheet{position:fixed;inset:0;z-index:30;background:rgb(0 0 0 / .4);display:flex;align-items:flex-end;justify-content:center}
+.sheet-in{background:var(--surface);width:100%;max-width:560px;border-radius:20px 20px 0 0;display:flex;flex-direction:column;gap:18px;
+  padding-block:20px calc(20px + env(safe-area-inset-bottom,0px));
+  padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px))}
+.set{display:flex;flex-direction:column;gap:8px}
+.set label{font:600 15px var(--f-body)}
+.set p{font-size:13px;color:var(--muted)}
+.set-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.danger{color:var(--miss)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand"><span class="brand-mark"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" style="color:var(--accent-ink)"><path d="M2 4h12M2 8h12M2 12h12"/><path d="M6 2v12M11 2v12" opacity=".5"/></svg></span>Гриф</div>
+    <button class="icon-btn" id="btnSet" aria-label="Настройки"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></button>
+  </header>
+
+  <section class="view" id="v-today">
+    <div>
+      <div class="eyebrow" id="tDate"></div>
+      <h1 class="h1" id="tHello">Сегодня</h1>
+    </div>
+    <div class="day">
+      <svg class="ring" viewBox="0 0 84 84" aria-hidden="true">
+        <circle class="bgc" cx="42" cy="42" r="36"/>
+        <circle class="fgc" id="ringFg" cx="42" cy="42" r="36" stroke-dasharray="226.2" stroke-dashoffset="226.2"/>
+        <text x="42" y="49" text-anchor="middle" id="ringTxt">0</text>
+      </svg>
+      <div class="day-info">
+        <b id="dayMin">0 из 20 минут</b>
+        <span class="sub" id="dayNote">Занятие на сегодня ещё впереди</span>
+        <span class="streak">Дней подряд: <b id="streak">0</b></span>
+      </div>
+    </div>
+    <div>
+      <div class="eyebrow" style="margin-bottom:10px">План на сегодня</div>
+      <ol class="plan" id="plan"></ol>
+    </div>
+  </section>
+
+  <section class="view" id="v-lessons" hidden>
+    <div>
+      <div class="eyebrow">Программа</div>
+      <h1 class="h1">Уроки</h1>
+    </div>
+    <p class="sub">Урок открывается, когда в прошлом набрано 2 звезды и больше.</p>
+    <div id="stages" style="display:flex;flex-direction:column;gap:26px"></div>
+  </section>
+
+  <section class="view" id="v-tuner" hidden>
+    <div>
+      <div class="eyebrow">Стандартный строй E A D G B E</div>
+      <h1 class="h1">Тюнер</h1>
+    </div>
+    <div class="tuner">
+      <div class="t-note" id="tNote">–</div>
+      <div class="t-hz" id="tHz">Сыграй открытую струну</div>
+      <svg class="gauge" viewBox="0 0 360 170" aria-hidden="true">
+        <g id="ticks"></g>
+        <text x="40" y="166" text-anchor="middle">−50</text>
+        <text x="180" y="22" text-anchor="middle">0</text>
+        <text x="320" y="166" text-anchor="middle">+50</text>
+        <line class="needle" id="needle" x1="180" y1="150" x2="180" y2="40"/>
+        <circle class="hub" cx="180" cy="150" r="7"/>
+      </svg>
+      <div class="t-state" id="tState"></div>
+      <div class="strings" id="strBtns"></div>
+      <button class="btn primary" id="tMic" style="width:100%">Включить микрофон</button>
+      <div class="mic-msg" id="tErr" hidden></div>
+    </div>
+    <p class="hint">Крути колок медленно. Ниже нужного — подтягивай, выше — ослабь и подтяни снова снизу вверх, так струна лучше держит строй.</p>
+  </section>
+
+  <section class="view" id="v-metro" hidden>
+    <div>
+      <div class="eyebrow">Темп</div>
+      <h1 class="h1">Метроном</h1>
+    </div>
+    <div class="metro">
+      <div class="bpm">
+        <button class="round" id="mMinus" aria-label="Медленнее">−</button>
+        <div><div class="bpm-val" id="mVal">80</div><div class="bpm-unit">уд/мин</div></div>
+        <button class="round" id="mPlus" aria-label="Быстрее">+</button>
+      </div>
+      <input type="range" id="mRange" min="40" max="200" value="80" aria-label="Темп">
+      <div class="seg" id="mSig" role="group" aria-label="Размер">
+        <button data-b="2" aria-pressed="false">2/4</button>
+        <button data-b="3" aria-pressed="false">3/4</button>
+        <button data-b="4" aria-pressed="true">4/4</button>
+      </div>
+      <div class="beats" id="mBeats"></div>
+      <button class="btn primary" id="mStart" style="width:100%">Старт</button>
+    </div>
+    <p class="hint">Начинай упражнение на 60, когда получается ровно три раза подряд, прибавляй 5.</p>
+  </section>
+</div>
+
+<nav class="tabs" aria-label="Разделы">
+  <div class="tabs-in">
+    <button class="tab" data-v="today" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>Сегодня</button>
+    <button class="tab" data-v="lessons"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 6h14M5 12h14M5 18h9"/></svg>Уроки</button>
+    <button class="tab" data-v="tuner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17a8 8 0 0 1 16 0"/><path d="M12 17l4-6"/></svg>Тюнер</button>
+    <button class="tab" data-v="metro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3h6l4 18H5z"/><path d="M12 15l5-8"/></svg>Метроном</button>
+  </div>
+</nav>
+
+<div class="player" id="player" hidden>
+  <div class="p-in">
+    <div class="p-head">
+      <button class="icon-btn" id="pBack" aria-label="Назад"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div class="p-title"><b id="pTitle"></b><span id="pSub"></span></div>
+      <div class="stars" id="pStars"></div>
+    </div>
+    <div class="p-tip" id="pTip"></div>
+    <div class="hw-wrap">
+      <canvas id="hw"></canvas>
+      <div class="count" id="pCount" hidden></div>
+      <div class="result" id="pRes" hidden>
+        <div class="r-card">
+          <div class="r-stars" id="rStars"></div>
+          <div class="r-pct" id="rPct"></div>
+          <div class="r-txt" id="rTxt"></div>
+          <button class="btn primary" id="rNext">Следующий урок</button>
+          <div class="row" style="width:100%">
+            <button class="btn" id="rAgain">Ещё раз</button>
+            <button class="btn" id="rPlan">К плану</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="p-info">
+      <div class="target"><b id="pTarget">–</b><span id="pTargetSub"></span></div>
+      <div class="hear"><span class="hear-n" id="pHear">тишина</span><div class="meter"><i id="pMeter"></i></div></div>
+    </div>
+    <canvas id="fb"></canvas>
+    <div class="p-meta">
+      <span class="score" id="pScore"></span>
+      <label class="toggle" id="pClickWrap"><input type="checkbox" id="pClick"> Щелчки</label>
+    </div>
+    <div class="mic-msg" id="pErr" hidden></div>
+    <div class="p-ctrl">
+      <button class="btn" id="pDemo"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 8.5a5 5 0 0 1 0 7" fill="none" stroke="currentColor" stroke-width="2"/></svg>Послушать</button>
+      <button class="btn primary" id="pGo">Начать</button>
+    </div>
+  </div>
+</div>
+
+<div class="sheet" id="sheet" hidden>
+  <div class="sheet-in">
+    <div class="set-row"><h2 style="font:600 19px var(--f-body)">Настройки</h2><button class="icon-btn" id="setClose" aria-label="Закрыть"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="set">
+      <label for="sens">Чувствительность микрофона: <span id="sensVal"></span></label>
+      <input type="range" id="sens" min="1" max="10" step="1">
+      <p>Если приложение не слышит тихие ноты, прибавь. Если ловит шум комнаты, убавь.</p>
+    </div>
+    <div class="set">
+      <div class="set-row"><label for="unlock">Открыть все уроки</label><input type="checkbox" id="unlock" style="width:22px;height:22px;accent-color:var(--accent)"></div>
+      <p>Для тех, кто уже умеет и хочет перескочить этап.</p>
+    </div>
+    <div class="set">
+      <button class="btn danger" id="reset">Сбросить прогресс</button>
+      <div class="row" id="resetAsk" hidden>
+        <button class="btn danger" id="resetYes">Да, сбросить всё</button>
+        <button class="btn" id="resetNo">Отмена</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+
+/* ---------- Музыка ---------- */
+const OPEN = {1:64, 2:59, 3:55, 4:50, 5:45, 6:40};          // MIDI открытых струн, 1-я самая тонкая
+const NN = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const RU = ['До','До♯','Ре','Ре♯','Ми','Фа','Фа♯','Соль','Соль♯','Ля','Ля♯','Си'];
+const m2f = m => 440 * Math.pow(2, (m - 69) / 12);
+const f2m = f => 69 + 12 * Math.log2(f / 440);
+const pc = m => ((Math.round(m) % 12) + 12) % 12;
+const ruName = m => RU[pc(m)];
+const sci = m => NN[pc(m)] + (Math.floor(Math.round(m) / 12) - 1);
+const FINGER = ['открытая', 'указательный', 'средний', 'безымянный', 'мизинец'];
+
+// "1:0 2:3/2" → [{s:1,f:0,d:1},{s:2,f:3,d:2}]
+const seq = str => str.trim().split(/\s+/).map(t => {
+  const [sf, d] = t.split('/'); const [s, f] = sf.split(':').map(Number);
+  return {s, f, d: d ? Number(d) : 1};
+});
+const rep = (s, n) => Array(n).fill(s).join(' ');
+const L = (id, title, sub, mode, bpm, tab, tip) => ({id, title, sub, mode, bpm, tab, tip});
+
+/* ---------- Программа ---------- */
+const STAGES = [
+  {n:1, title:'Открытые струны 1–3', sub:'Чистый звук и первые три струны', lessons:[
+    L('1-1','Первая струна','Ми, самая тонкая','wait',60, rep('1:0',8),
+      'Первая струна самая тонкая, она ближе всех к полу. Дёрни её вниз и дай прозвучать. Приложение ждёт, пока ты сыграешь нужную ноту.'),
+    L('1-2','Вторая струна','Си','wait',60, rep('2:0',8),
+      'Вторая струна лежит сразу над первой. Старайся задеть только её.'),
+    L('1-3','Третья струна','Соль','wait',60, rep('3:0',8),
+      'Третья струна над второй. Если звенят соседние, приглуши их ребром ладони.'),
+    L('1-4','Первая и вторая','Переход между струнами','wait',60, rep('1:0 2:0',4) + ' 2:0 2:0 1:0 1:0',
+      'Медиатор или палец двигается совсем чуть-чуть: от струны к струне меньше сантиметра.'),
+    L('1-5','Три струны','Вверх и вниз','wait',60, rep('3:0 2:0 1:0 2:0',3),
+      'Смотри на ноту на экране, а не на руку. Струна подписана слева, цвет ноты совпадает с цветом струны.'),
+    L('1-6','Первый ритм','Играем под щелчки','tempo',60, '1:0 1:0 2:0 2:0 3:0 3:0 2:0 2:0 1:0/2 2:0/2 3:0/4',
+      'Теперь ноты едут сами. Дёргай струну, когда нота касается линии. Перед стартом будет 4 щелчка отсчёта.'),
+    L('1-7','Чередование','Ровно, без остановок','tempo',70, rep('3:0 2:0 1:0 2:0',4) + ' 3:0/4',
+      'Если сбился, не останавливайся: пропусти ноту и вступи на следующей.'),
+    L('1-8','Проверка этапа','Всё вместе, чуть быстрее','tempo',80,
+      '1:0 1:0 2:0 2:0 3:0/2 2:0/2 1:0 2:0 3:0 2:0 1:0/2 1:0/2 3:0 3:0 2:0 2:0 1:0 2:0 3:0/2 1:0/4',
+      'Контрольная этапа. Две звезды и больше открывают ноты на ладах.')
+  ]},
+  {n:2, title:'Ноты на ладах 1–3', sub:'Прижимаем струны левой рукой', lessons:[
+    L('2-1','Нота Фа','1-я струна, 1-й лад','wait',60, rep('1:0 1:1',4),
+      'Указательный палец на 1-й лад первой струны. Прижимай кончиком, ближе к металлической планке, а не посередине лада.'),
+    L('2-2','Нота Соль','1-я струна, 3-й лад','wait',60, rep('1:0 1:1 1:3 1:1',3),
+      'Соль берём безымянным пальцем на 3-м ладу. Один палец на один лад, и рука не прыгает.'),
+    L('2-3','До и Ре','2-я струна, лады 1 и 3','wait',60, rep('2:0 2:1 2:3 2:1',3),
+      'Те же пальцы, что на первой струне, только на струну выше. До — указательный, Ре — безымянный.'),
+    L('2-4','Нота Ля','3-я струна, 2-й лад','wait',60, rep('3:0 3:2',4) + ' 3:2 3:0 3:2 3:2',
+      'Средний палец на 2-й лад третьей струны. Большой палец левой руки держи за грифом, примерно напротив среднего.'),
+    L('2-5','Гамма До мажор','До Ре Ми Фа Соль и обратно','wait',60, '2:1 2:3 1:0 1:1 1:3 1:1 1:0 2:3 2:1',
+      'Пять нот подряд, из них дальше строятся мелодии. Не спеши, главное чистый звук без дребезга.'),
+    L('2-6','Гамма в темпе','Под щелчки','tempo',60,
+      '2:1 2:3 1:0 1:1 1:3/2 1:1 1:0 2:3 2:1/2 2:1 2:3 1:0 1:1 1:3 1:1 1:0 2:3 2:1/4',
+      'Палец ставь заранее, ещё до того, как нота дошла до линии.'),
+    L('2-7','Три струны с ладами','Соль Ля Си До Ре','wait',60, '3:0 3:2 2:0 2:1 2:3 2:1 2:0 3:2 3:0',
+      'Здесь меняются и струна, и лад. Смотри на подсказку грифа под нотами.'),
+    L('2-8','Проверка этапа','Все ноты этапа в темпе','tempo',70,
+      '3:0 3:2 2:0 2:1 2:3 1:0 1:1 1:3/2 1:1 1:0 2:3 2:1 2:0 3:2 3:0/2 1:3 1:1 2:3 2:1 3:2/2 3:0/2',
+      'Контрольная этапа. Две звезды открывают первые мелодии.')
+  ]},
+  {n:3, title:'Первые мелодии', sub:'Ноты складываются в музыку', lessons:[
+    L('3-1','Этюд «Лесенка»','Разминка на трёх струнах','tempo',70,
+      '3:0 3:2 2:0 2:1 2:3/2 2:1 2:0 3:2/2 3:0 2:0 2:3 1:0 1:1/2 1:0 2:3 2:1/4',
+      'Мелодия поднимается и спускается, как по ступенькам. Длинные ноты держи, не глуши раньше времени.'),
+    L('3-2','«Ах, скажу я вам, мама»','Народная французская мелодия','tempo',72,
+      '3:0 3:0 2:3 2:3 1:0 1:0 2:3/2 2:1 2:1 2:0 2:0 3:2 3:2 3:0/2 2:3 2:3 2:1 2:1 2:0 2:0 3:2/2 2:3 2:3 2:1 2:1 2:0 2:0 3:2/2 3:0 3:0 2:3 2:3 1:0 1:0 2:3/2 2:1 2:1 2:0 2:0 3:2 3:2 3:0/2',
+      'Её все знают как «Twinkle, twinkle, little star». Повторы одной ноты дёргай заново каждый раз.'),
+    L('3-3','«Ода к радости»','Бетховен, 9-я симфония','tempo',72,
+      '1:0 1:0 1:1 1:3 1:3 1:1 1:0 2:3 2:1 2:1 2:3 1:0 1:0/1.5 2:3/0.5 2:3/2 1:0 1:0 1:1 1:3 1:3 1:1 1:0 2:3 2:1 2:1 2:3 1:0 2:3/1.5 2:1/0.5 2:1/2',
+      'Почти вся мелодия на первой струне. Ноты с точкой чуть длиннее, после них короткая.')
+  ]},
+  {n:4, title:'Все шесть струн', sub:'Басовые струны и ноты на них', soon:true},
+  {n:5, title:'Первые аккорды', sub:'Em, Am, C, G, D', soon:true},
+  {n:6, title:'Смена аккордов', sub:'Переставляем пальцы на время', soon:true},
+  {n:7, title:'Бой', sub:'Ритм правой рукой под метроном', soon:true},
+  {n:8, title:'Перебор', sub:'Играем аккорды по струнам', soon:true}
+];
+const FLAT = [];
+STAGES.forEach(st => (st.lessons || []).forEach(l => {
+  l.stage = st.n;
+  l.notes = seq(l.tab);
+  FLAT.push(l);
+}));
+
+/* ---------- Хранилище ---------- */
+const KEY = 'grif-v1';
+const dkey = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+let S = load();
+function load() {
+  let d = null;
+  try { d = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) {}
+  d = d || {};
+  d.lessons = d.lessons || {}; d.days = d.days || {};
+  if (!d.sens) d.sens = 6;
+  if (!d.bpm) d.bpm = 80;
+  if (!d.sig) d.sig = 4;
+  d.unlockAll = !!d.unlockAll;
+  d.click = d.click !== false;
+  return d;
+}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+function day() { const k = dkey(new Date()); return S.days[k] || (S.days[k] = {sec:0, done:[]}); }
+function streak() {
+  const d = new Date(); let n = 0;
+  if (!((S.days[dkey(d)] || {}).sec >= 60)) d.setDate(d.getDate() - 1);
+  while ((S.days[dkey(d)] || {}).sec >= 60) { n++; d.setDate(d.getDate() - 1); }
+  return n;
+}
+const starsOf = id => (S.lessons[id] || {}).stars || 0;
+const unlocked = i => S.unlockAll || i === 0 || starsOf(FLAT[i - 1].id) >= 2;
+const GOAL_MIN = 20;
+
+/* ---------- Звук и микрофон ---------- */
+const A = {ctx:null, an:null, buf:null, stream:null, on:false, src:null};
+async function ctx() {
+  if (!A.ctx) A.ctx = new (window.AudioContext || window.webkitAudioContext)();
+  if (A.ctx.state === 'suspended') { try { await A.ctx.resume(); } catch (e) {} }
+  return A.ctx;
+}
+function micError(e) {
+  if (!window.isSecureContext) return 'Микрофон работает только по защищённой ссылке https://. Открой приложение по ней.';
+  if (e && (e.name === 'NotAllowedError' || e.name === 'SecurityError')) return 'Нет доступа к микрофону. Разреши его для этого сайта в настройках браузера и обнови страницу.';
+  if (e && e.name === 'NotFoundError') return 'Микрофон не найден.';
+  return 'Не получилось включить микрофон.';
+}
+async function micStart(errEl) {
+  if (A.on) return true;
+  await ctx();
+  try {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('nomedia');
+    A.stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:false}});
+  } catch (e) {
+    if (errEl) { errEl.textContent = micError(e); errEl.hidden = false; }
+    return false;
+  }
+  if (errEl) errEl.hidden = true;
+  attach(A.ctx.createMediaStreamSource(A.stream));
+  return true;
+}
+function attach(src) {
+  A.an = A.ctx.createAnalyser(); A.an.fftSize = 2048;
+  src.connect(A.an);
+  A.src = src; A.buf = new Float32Array(A.an.fftSize); A.on = true;
+}
+function micStop() {
+  if (A.stream) A.stream.getTracks().forEach(t => t.stop());
+  if (A.src) { try { A.src.disconnect(); } catch (e) {} }
+  if (A.src && A.src.stop) { try { A.src.stop(); } catch (e) {} }
+  A.stream = null; A.src = null; A.on = false;
+  resetP();
+}
+// Для проверки без гитары: в консоли gfTestTone(64) — синусоида вместо микрофона, gfTestTone() — выключить
+window.gfTestTone = async m => {
+  micStop(); await ctx();
+  if (m == null) return;
+  const o = A.ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = m2f(m); o.start();
+  attach(o);
+  return {setNote: n => { o.frequency.value = m2f(n); P.onsetT = performance.now() / 1000; P.mh.length = 0; P.stable = null; }};
+};
+
+/* Определение высоты: YIN по окну 1024 отсчёта, диапазон 70–1100 Гц */
+let yinD = null;
+function yin(buf, sr) {
+  const W = 1024, minT = Math.floor(sr / 1100), maxT = Math.min(Math.floor(sr / 70), buf.length - W - 2);
+  if (!yinD || yinD.length < maxT + 2) yinD = new Float32Array(maxT + 2);
+  const d = yinD;
+  d[0] = 1;
+  let run = 0;
+  for (let t = 1; t <= maxT + 1; t++) {
+    let s = 0;
+    for (let i = 0; i < W; i++) { const x = buf[i] - buf[i + t]; s += x * x; }
+    run += s;
+    d[t] = run ? s * t / run : 1;
+  }
+  let tau = -1;
+  for (let t = minT; t <= maxT; t++) {
+    if (d[t] < 0.12) { while (t + 1 <= maxT && d[t + 1] < d[t]) t++; tau = t; break; }
+  }
+  if (tau < 0) {
+    let b = minT;
+    for (let t = minT; t <= maxT; t++) if (d[t] < d[b]) b = t;
+    if (d[b] < 0.25) tau = b; else return -1;
+  }
+  const a = d[tau - 1], b = d[tau], c = d[tau + 1];
+  const den = a - 2 * b + c;
+  const sh = den ? (a - c) / (2 * den) : 0;
+  return sr / (tau + (Math.abs(sh) < 1 ? sh : 0));
+}
+
+const P = {rms:0, m:null, stable:null, onsetT:-10, hist:[], mh:[]};
+function resetP() { P.rms = 0; P.m = null; P.stable = null; P.hist.length = 0; P.mh.length = 0; }
+const gate = () => 0.03 * Math.pow(0.68, S.sens - 1);
+let lastDet = 0;
+function detect(now) {
+  if (!A.on || now - lastDet < 0.02) return;
+  lastDet = now;
+  A.an.getFloatTimeDomainData(A.buf);
+  let r = 0;
+  for (let i = 0; i < A.buf.length; i++) r += A.buf[i] * A.buf[i];
+  r = Math.sqrt(r / A.buf.length);
+  const g = gate(), h = P.hist;
+  h.push(r); if (h.length > 8) h.shift();
+  if (r > g && h.length > 3 && now - P.onsetT > 0.13) {
+    const ref = Math.min(...h.slice(0, h.length - 2));
+    if (r > ref * 2) { P.onsetT = now; P.mh.length = 0; P.stable = null; }
+  }
+  P.rms = r;
+  if (r < g) { P.m = null; P.stable = null; P.mh.length = 0; return; }
+  if (now - P.onsetT < 0.05) return;   // в окне анализатора ещё звучит прошлая нота
+  const f = yin(A.buf, A.ctx.sampleRate);
+  if (f < 0) { P.m = null; P.stable = null; P.mh.length = 0; return; }
+  P.m = f2m(f); P.f = f;
+  P.mh.push(P.m); if (P.mh.length > 3) P.mh.shift();
+  if (P.mh.length === 3) {
+    const s = [...P.mh].sort((x, y) => x - y);
+    P.stable = s[2] - s[0] < 0.6 ? s[1] : null;
+  } else P.stable = null;
+}
+// Совпадение ноты с допуском 55 центов; октаву прощаем, микрофон телефона иногда ловит обертон
+function match(m, target) {
+  let d = (m - target) % 12;
+  if (d > 6) d -= 12; if (d < -6) d += 12;
+  return Math.abs(d) < 0.55;
+}
+
+/* Щелчок и звук струны */
+function click(at, accent) {
+  const c = A.ctx, o = c.createOscillator(), g = c.createGain();
+  o.frequency.value = accent ? 1500 : 1000;
+  g.gain.setValueAtTime(0.0001, at);
+  g.gain.exponentialRampToValueAtTime(accent ? 0.5 : 0.3, at + 0.002);
+  g.gain.exponentialRampToValueAtTime(0.0001, at + 0.05);
+  o.connect(g).connect(c.destination);
+  o.start(at); o.stop(at + 0.06);
+  return o;
+}
+const pluckCache = {};
+function pluckBuf(m) {   // Карплус-Стронг
+  if (pluckCache[m]) return pluckCache[m];
+  const sr = A.ctx.sampleRate, N = Math.round(sr / m2f(m)), len = Math.floor(sr * 1.6);
+  const b = A.ctx.createBuffer(1, len, sr), out = b.getChannelData(0), ring = new Float32Array(N);
+  for (let i = 0; i < N; i++) ring[i] = Math.random() * 2 - 1;
+  let p = 0;
+  for (let i = 0; i < len; i++) {
+    const nx = (p + 1) % N, v = ring[p];
+    out[i] = v * 0.4 * (i > len - 2000 ? (len - i) / 2000 : 1);
+    ring[p] = 0.498 * (v + ring[nx]);
+    p = nx;
+  }
+  return (pluckCache[m] = b);
+}
+function pluck(m, at) {
+  const s = A.ctx.createBufferSource(); s.buffer = pluckBuf(m);
+  s.connect(A.ctx.destination); s.start(at);
+  return s;
+}
+
+/* ---------- Навигация ---------- */
+let view = 'today';
+function show(v) {
+  view = v;
+  ['today', 'lessons', 'tuner', 'metro'].forEach(x => { $('#v-' + x).hidden = x !== v; });
+  document.querySelectorAll('.tab').forEach(t => { if (t.dataset.v === v) t.setAttribute('aria-current', 'page'); else t.removeAttribute('aria-current'); });
+  if (v !== 'tuner' && A.on && !Pl.open) { micStop(); tunerUI(); }
+  if (v === 'today') renderToday();
+  if (v === 'lessons') renderLessons();
+  if (v === 'tuner') tunerUI();
+  window.scrollTo(0, 0);
+}
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => show(t.dataset.v)));
+
+/* ---------- Сегодня ---------- */
+const STAR = '<svg viewBox="0 0 24 24"><path d="M12 2.5l2.9 6 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.2 1.3-6.6-4.9-4.6 6.6-.8z"/></svg>';
+const starsHTML = n => [1, 2, 3].map(i => STAR.replace('<svg', '<svg class="' + (i <= n ? 'on' : '') + '"')).join('');
+const MONTHS = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+const WD = ['воскресенье','понедельник','вторник','среда','четверг','пятница','суббота'];
+
+function planFor() {
+  const d = day();
+  if (d.plan) return d.plan;
+  const items = [{key:'tune', kind:'tune', label:'Настройка', title:'Настрой гитару', sub:'По тюнеру, все шесть струн', mins:2}];
+  const passed = FLAT.filter(l => starsOf(l.id) >= 2);
+  const next = FLAT.find(l => starsOf(l.id) < 2);
+  const last = passed[passed.length - 1];
+  if (last) items.push({key:'warm', kind:'lesson', id:last.id, label:'Разминка', mins:5});
+  if (next) items.push({key:'new', kind:'lesson', id:next.id, label:'Новый урок', mins:10});
+  const weak = passed.filter(l => l !== last && starsOf(l.id) < 3).sort((a, b) => starsOf(a.id) - starsOf(b.id))[0];
+  if (weak) items.push({key:'fix', kind:'lesson', id:weak.id, label:'Закрепление', mins:5});
+  else if (next) items.push({key:'fix', kind:'lesson', id:next.id, label:'Ещё подход', mins:5});
+  else if (last) items.push({key:'fix', kind:'lesson', id:FLAT[Math.max(0, FLAT.length - 2)].id, label:'Закрепление', mins:5});
+  d.plan = items; save();
+  return items;
+}
+function renderToday() {
+  const now = new Date(), d = day();
+  $('#tDate').textContent = WD[now.getDay()] + ', ' + now.getDate() + ' ' + MONTHS[now.getMonth()];
+  const h = now.getHours();
+  $('#tHello').textContent = h < 5 ? 'Доброй ночи' : h < 12 ? 'Доброе утро' : h < 18 ? 'Добрый день' : 'Добрый вечер';
+  const min = Math.floor(d.sec / 60);
+  const frac = Math.min(1, d.sec / (GOAL_MIN * 60));
+  $('#ringFg').style.strokeDashoffset = String(226.2 * (1 - frac));
+  $('#ringTxt').textContent = min;
+  $('#dayMin').textContent = min + ' из ' + GOAL_MIN + ' минут';
+  const plan = planFor(), left = plan.filter(p => !d.done.includes(p.key)).length;
+  $('#dayNote').textContent = frac >= 1 && !left ? 'Занятие на сегодня выполнено' : left ? 'Осталось шагов: ' + left : 'План выполнен, можно повторить что угодно';
+  $('#streak').textContent = streak();
+  $('#plan').innerHTML = '';
+  plan.forEach(p => {
+    const li = document.createElement('li');
+    const b = document.createElement('button');
+    b.className = 'pi' + (d.done.includes(p.key) ? ' done' : '');
+    let title = p.title, sub = p.sub;
+    if (p.kind === 'lesson') { const l = FLAT.find(x => x.id === p.id); title = l.title; sub = 'Этап ' + l.stage + ' · ' + l.sub; }
+    b.innerHTML = '<span class="pi-n"></span><span class="pi-body"><span class="pi-label"></span><span class="pi-title"></span><span class="pi-sub"></span></span><span class="pi-min"></span>';
+    b.querySelector('.pi-label').textContent = p.label;
+    b.querySelector('.pi-title').textContent = title;
+    b.querySelector('.pi-sub').textContent = sub;
+    b.querySelector('.pi-min').textContent = p.mins + ' мин';
+    b.addEventListener('click', () => {
+      if (p.kind === 'tune') { tuneTask = true; show('tuner'); }
+      else openLesson(FLAT.find(x => x.id === p.id), p.key);
+    });
+    li.appendChild(b); $('#plan').appendChild(li);
+  });
+}
+function markDone(key) {
+  const d = day();
+  if (key && !d.done.includes(key)) { d.done.push(key); save(); }
+}
+
+/* ---------- Уроки ---------- */
+const LOCK = '<svg class="lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
+function renderLessons() {
+  const box = $('#stages'); box.innerHTML = '';
+  STAGES.forEach(st => {
+    const el = document.createElement('div'); el.className = 'stage' + (st.soon ? ' soon' : '');
+    el.innerHTML = '<div class="stage-head"><span class="stage-num">' + st.n + '</span><div><h3></h3><p></p></div></div><div class="lessons"></div>';
+    el.querySelector('h3').textContent = st.title;
+    el.querySelector('p').textContent = st.sub;
+    const ls = el.querySelector('.lessons');
+    if (st.soon) {
+      const n = document.createElement('div'); n.className = 'soon-note';
+      n.textContent = 'Этап в разработке. Появится после проверки первых этапов.';
+      ls.appendChild(n);
+    } else st.lessons.forEach(l => {
+      const i = FLAT.indexOf(l), open = unlocked(i);
+      const b = document.createElement('button'); b.className = 'li'; b.disabled = !open;
+      b.innerHTML = '<span class="li-body"><span class="li-title"></span><span class="li-sub"></span></span><span class="li-mode"></span>' + (open ? '<span class="stars">' + starsHTML(starsOf(l.id)) + '</span>' : LOCK);
+      b.querySelector('.li-title').textContent = l.title;
+      b.querySelector('.li-sub').textContent = l.sub;
+      b.querySelector('.li-mode').textContent = l.mode === 'wait' ? 'ЖДЁТ' : l.bpm + ' BPM';
+      b.addEventListener('click', () => openLesson(l));
+      ls.appendChild(b);
+    });
+    box.appendChild(el);
+  });
+}
+
+/* ---------- Плеер урока ---------- */
+const Pl = {open:false, lesson:null, planKey:null, state:'idle', notes:[], idx:0, mistakes:0, scroll:0, t0:0, sched:[], demoEnd:0, hitFlash:0, missFlash:0, armT:0, usedOnset:-1, seenOnset:-1, wrongCounted:false, prevMidi:null, endT:0};
+const hw = $('#hw'), hx = hw.getContext('2d'), fb = $('#fb'), fx = fb.getContext('2d');
+let COL = {};
+function readColors() {
+  const cs = getComputedStyle(document.documentElement);
+  ['surface','surface-2','fg','muted','line','accent','hit','miss','gold','s1','s2','s3','s4','s5','s6'].forEach(k => COL[k] = cs.getPropertyValue('--' + k).trim());
+}
+function fit(c) {
+  const r = c.getBoundingClientRect(), dpr = Math.min(3, window.devicePixelRatio || 1);
+  const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+  if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+  return {w:r.width, h:r.height, dpr};
+}
+
+function openLesson(l, planKey) {
+  Pl.open = true; Pl.lesson = l; Pl.planKey = planKey || null;
+  $('#player').hidden = false;
+  $('#pTitle').textContent = l.title;
+  $('#pSub').textContent = 'Этап ' + l.stage + ' · ' + (l.mode === 'wait' ? 'в своём темпе' : l.bpm + ' ударов в минуту');
+  $('#pTip').textContent = l.tip;
+  $('#pStars').innerHTML = starsHTML(starsOf(l.id));
+  $('#pClickWrap').hidden = l.mode === 'wait';
+  $('#pClick').checked = S.click;
+  $('#pErr').hidden = true;
+  readColors();
+  reset();
+  document.body.style.overflow = 'hidden';
+}
+function closeLesson() {
+  stopRun(); stopDemo();
+  Pl.open = false; $('#player').hidden = true; document.body.style.overflow = '';
+  if (A.on && view !== 'tuner') micStop();
+  if (view === 'today') renderToday();
+  if (view === 'lessons') renderLessons();
+}
+function reset() {
+  const l = Pl.lesson;
+  let beat = 0;
+  Pl.notes = l.notes.map(n => { const o = {s:n.s, f:n.f, d:n.d, midi:OPEN[n.s] + n.f, beat, st:'pending', fx:0}; beat += n.d; return o; });
+  Pl.totalBeats = beat;
+  Pl.idx = 0; Pl.mistakes = 0; Pl.scroll = 0; Pl.state = 'idle'; Pl.prevMidi = null;
+  Pl.usedOnset = P.onsetT; Pl.armT = performance.now() / 1000;
+  $('#pRes').hidden = true; $('#pCount').hidden = true;
+  $('#pGo').textContent = 'Начать'; $('#pGo').disabled = false;
+  $('#pDemo').disabled = false;
+  updateScore(); updateTarget();
+}
+function stopRun() {
+  Pl.sched.forEach(o => { try { o.stop(); } catch (e) {} });
+  Pl.sched = [];
+  if (Pl.state === 'run' || Pl.state === 'count') Pl.state = 'idle';
+}
+async function start() {
+  stopDemo();
+  if (!(await micStart($('#pErr')))) return;
+  reset();
+  const l = Pl.lesson, now = performance.now() / 1000;
+  Pl.armT = now; Pl.usedOnset = P.onsetT; Pl.seenOnset = P.onsetT;
+  $('#pGo').textContent = 'Стоп'; $('#pDemo').disabled = true;
+  if (l.mode === 'wait') { Pl.state = 'run'; return; }
+  const beat = 60 / l.bpm, lead = 0.25, countIn = 4;
+  const at0 = A.ctx.currentTime + lead;
+  Pl.t0 = now + lead + countIn * beat;          // время первой ноты по часам страницы
+  Pl.beat = beat;
+  const total = countIn + Math.ceil(Pl.totalBeats);
+  for (let i = 0; i < total; i++) {
+    if (i < countIn || S.click) Pl.sched.push(click(at0 + i * beat, i % 4 === 0));
+  }
+  Pl.countStart = now + lead;
+  Pl.endT = Pl.t0 + Pl.totalBeats * beat + 0.4;
+  Pl.state = 'count';
+}
+function finish() {
+  stopRun();
+  const n = Pl.notes.length, hits = Pl.notes.filter(x => x.st === 'hit').length;
+  const acc = Pl.lesson.mode === 'wait' ? hits / (hits + Pl.mistakes) : hits / n;
+  const stars = acc >= 0.93 ? 3 : acc >= 0.8 ? 2 : acc >= 0.6 ? 1 : 0;
+  const id = Pl.lesson.id, rec = S.lessons[id] || {stars:0, best:0};
+  const ni = FLAT.indexOf(Pl.lesson) + 1;
+  const wasLocked = ni < FLAT.length && !unlocked(ni);
+  rec.stars = Math.max(rec.stars, stars); rec.best = Math.max(rec.best, Math.round(acc * 100)); rec.plays = (rec.plays || 0) + 1;
+  S.lessons[id] = rec;
+  // отметить шаг плана: явный из плана или первый невыполненный с этим уроком
+  const d = day(), plan = planFor();
+  const key = Pl.planKey || (plan.find(p => p.id === id && !d.done.includes(p.key)) || {}).key;
+  markDone(key);
+  save();
+  Pl.state = 'done';
+  $('#rStars').innerHTML = starsHTML(stars);
+  $('#rPct').textContent = Math.round(acc * 100) + '%';
+  const i = FLAT.indexOf(Pl.lesson), next = FLAT[i + 1];
+  let txt = Pl.lesson.mode === 'wait'
+    ? 'Сыграно ' + hits + ' нот, ошибок: ' + Pl.mistakes + '.'
+    : 'Попал в ' + hits + ' из ' + n + ' нот.';
+  if (stars >= 2 && next && wasLocked) txt += ' Открыт урок «' + next.title + '».';
+  else if (stars < 2) txt += ' Нужно 80%, чтобы открыть следующий урок.';
+  $('#rTxt').textContent = txt;
+  $('#rNext').hidden = !(next && unlocked(i + 1));
+  $('#pRes').hidden = false;
+  $('#pStars').innerHTML = starsHTML(rec.stars);
+  $('#pGo').textContent = 'Начать'; $('#pDemo').disabled = false;
+}
+function updateScore() {
+  const hits = Pl.notes.filter(x => x.st === 'hit').length;
+  $('#pScore').textContent = 'Нот: ' + hits + ' / ' + Pl.notes.length + (Pl.lesson && Pl.lesson.mode === 'wait' ? ' · ошибок: ' + Pl.mistakes : '');
+}
+function currentNote() {
+  if (Pl.lesson.mode === 'wait') return Pl.notes[Pl.idx];
+  return Pl.notes.find(n => n.st === 'pending');
+}
+function updateTarget() {
+  const n = currentNote();
+  if (!n) { $('#pTarget').textContent = 'Готово'; $('#pTargetSub').textContent = ''; return; }
+  $('#pTarget').textContent = ruName(n.midi) + ' · ' + n.s + '-я струна';
+  $('#pTargetSub').textContent = n.f === 0 ? 'открытая струна, ничего не прижимаем' : n.f + '-й лад, ' + FINGER[n.f] + ' палец';
+}
+
+let demoSrc = [];
+async function demo() {
+  if (demoSrc.length) { stopDemo(); return; }
+  await ctx();
+  stopRun(); reset();
+  const l = Pl.lesson, bpm = l.mode === 'wait' ? 80 : l.bpm, beat = 60 / bpm, t = A.ctx.currentTime + 0.1;
+  Pl.notes.forEach(n => demoSrc.push(pluck(n.midi, t + n.beat * (l.mode === 'wait' ? 1 : 1) * beat)));
+  Pl.demoT0 = performance.now() / 1000 + 0.1; Pl.demoBeat = beat;
+  Pl.demoEnd = Pl.demoT0 + Pl.totalBeats * beat + 0.5;
+  Pl.state = 'demo';
+  $('#pDemo').lastChild.textContent = 'Стоп';
+  $('#pGo').disabled = true;
+}
+function stopDemo() {
+  demoSrc.forEach(s => { try { s.stop(); } catch (e) {} });
+  demoSrc = [];
+  $('#pDemo').lastChild.textContent = 'Послушать';
+  $('#pGo').disabled = false;
+  if (Pl.state === 'demo') Pl.state = 'idle';
+}
+
+function judge(now) {
+  const l = Pl.lesson;
+  if (P.onsetT !== Pl.seenOnset) { Pl.seenOnset = P.onsetT; Pl.wrongCounted = false; }
+  if (l.mode === 'wait') {
+    const n = Pl.notes[Pl.idx];
+    if (!n || P.stable == null) return;
+    const fresh = P.onsetT > Pl.armT;
+    if (match(P.stable, n.midi) && (fresh || Pl.prevMidi !== n.midi)) {
+      n.st = 'hit'; n.fx = now; Pl.prevMidi = n.midi; Pl.idx++; Pl.armT = now; Pl.hitFlash = now;
+      updateScore(); updateTarget();
+      if (Pl.idx >= Pl.notes.length) setTimeout(finish, 450);
+    } else if (fresh && !Pl.wrongCounted && now - P.onsetT > 0.12 && !match(P.stable, n.midi)
+               && !(Pl.prevMidi != null && match(P.stable, Pl.prevMidi) && now - P.onsetT < 0.3)) {
+      Pl.mistakes++; Pl.wrongCounted = true; Pl.missFlash = now; n.wrong = now;
+      updateScore();
+    }
+    return;
+  }
+  // режим темпа
+  const beat = Pl.beat, WIN = Math.min(0.3, beat * 0.5), LAT = 0.06;
+  let changed = false;
+  Pl.notes.forEach(n => {
+    if (n.st === 'pending' && now > Pl.t0 + n.beat * beat + WIN + LAT) { n.st = 'miss'; n.fx = now; changed = true; }
+  });
+  if (P.stable != null && P.onsetT > Pl.usedOnset && now - P.onsetT < 0.35) {
+    const tt = P.onsetT - LAT;
+    let best = null, bd = 9;
+    Pl.notes.forEach(n => {
+      if (n.st !== 'pending') return;
+      const dt = Math.abs(Pl.t0 + n.beat * beat - tt);
+      if (dt < WIN && dt < bd) { bd = dt; best = n; }
+    });
+    if (best && match(P.stable, best.midi)) {
+      best.st = 'hit'; best.fx = now; Pl.usedOnset = P.onsetT; Pl.hitFlash = now; changed = true;
+    } else if (best && now - P.onsetT > 0.12) {
+      best.wrong = now; Pl.usedOnset = P.onsetT; Pl.missFlash = now;
+    }
+  }
+  if (changed) { updateScore(); updateTarget(); }
+  if (now > Pl.endT) finish();
+}
+
+function strColor(s) { return COL['s' + s] || COL.accent; }
+function drawHighway(now) {
+  const {w, h, dpr} = fit(hw), c = hx, l = Pl.lesson;
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.clearRect(0, 0, w, h);
+  const maxS = Math.max(3, ...Pl.notes.map(n => n.s));
+  const top = 26, bot = h - 22, gap = (bot - top) / (maxS - 1);
+  const y = s => top + (s - 1) * gap;
+  const hitX = Math.max(64, w * 0.22);
+  // струны
+  for (let s = 1; s <= maxS; s++) {
+    c.strokeStyle = strColor(s); c.globalAlpha = 0.55; c.lineWidth = 1 + s * 0.45;
+    c.beginPath(); c.moveTo(30, y(s)); c.lineTo(w, y(s)); c.stroke();
+    c.globalAlpha = 1; c.fillStyle = COL.muted; c.font = '600 12px ' + 'JetBrains Mono, monospace';
+    c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(String(s), 14, y(s));
+  }
+  // линия удара
+  const flash = Math.max(0, 1 - (now - Pl.hitFlash) / 0.3), mflash = Math.max(0, 1 - (now - Pl.missFlash) / 0.35);
+  c.fillStyle = mflash > flash ? COL.miss : COL.accent;
+  c.globalAlpha = 0.12 + 0.35 * Math.max(flash, mflash);
+  c.fillRect(hitX - 22, 6, 44, h - 12);
+  c.globalAlpha = 1; c.fillStyle = mflash > flash ? COL.miss : COL.accent; c.fillRect(hitX - 1.5, 6, 3, h - 12);
+
+  // позиция нот
+  let xOf, pxBeat;
+  if (l.mode === 'wait') {
+    Pl.scroll += (Pl.idx - Pl.scroll) * 0.18;
+    const sp = Math.min(84, Math.max(60, w / 7));
+    xOf = (n, i) => hitX + (i - Pl.scroll) * sp; pxBeat = 0;
+  } else {
+    pxBeat = Math.max(70, Math.min(110, w / 6));
+    const ref = Pl.state === 'demo' ? Pl.demoT0 : Pl.t0, b = Pl.state === 'demo' ? Pl.demoBeat : Pl.beat;
+    const cur = (Pl.state === 'run' || Pl.state === 'count' || Pl.state === 'demo') ? (now - ref) / b : (Pl.state === 'done' ? Pl.totalBeats + 1 : -2);
+    xOf = n => hitX + (n.beat - cur) * pxBeat;
+  }
+  if (l.mode === 'wait' && Pl.state === 'demo') {
+    const cur = (now - Pl.demoT0) / Pl.demoBeat;
+    const sp = Math.min(84, Math.max(60, w / 7));
+    xOf = (n, i) => hitX + (i - cur) * sp;
+  }
+  const R = Math.min(17, gap * 0.42 + 6);
+  Pl.notes.forEach((n, i) => {
+    const x = xOf(n, i), yy = y(n.s);
+    if (x < -40 || x > w + 40) return;
+    if (pxBeat && n.d > 1) {   // хвост длинной ноты
+      c.globalAlpha = n.st === 'miss' ? 0.2 : 0.35; c.fillStyle = strColor(n.s);
+      c.fillRect(x, yy - 5, n.d * pxBeat - R - 6, 10); c.globalAlpha = 1;
+    }
+    let col = strColor(n.s), alpha = 1, rr = R;
+    if (n.st === 'hit') { col = COL.hit; const k = Math.min(1, (now - n.fx) / 0.4); rr = R * (1 + 0.35 * k); alpha = 1 - 0.75 * k; }
+    if (n.st === 'miss') { col = COL.line; }
+    c.globalAlpha = alpha;
+    c.fillStyle = col; c.beginPath(); c.arc(x, yy, rr, 0, Math.PI * 2); c.fill();
+    if (n.wrong && now - n.wrong < 0.4 && n.st === 'pending') {
+      c.strokeStyle = COL.miss; c.lineWidth = 3; c.beginPath(); c.arc(x, yy, rr + 4, 0, Math.PI * 2); c.stroke();
+    }
+    c.fillStyle = n.st === 'miss' ? COL.muted : '#fff';
+    c.font = '700 ' + Math.round(rr * 0.95) + 'px JetBrains Mono, monospace';
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillText(String(n.f), x, yy + 1);
+    c.globalAlpha = 1;
+  });
+  if (Pl.state === 'idle') {
+    c.fillStyle = COL.muted; c.font = '500 14px Golos Text, system-ui, sans-serif'; c.textAlign = 'center';
+    c.fillText(l.mode === 'wait' ? 'Цифра в кружке — лад, 0 — открытая струна' : 'Нажми «Начать», будет 4 щелчка отсчёта', w / 2 + hitX / 3, h - 9);
+  }
+}
+function drawFret(now) {
+  const {w, h, dpr} = fit(fb), c = fx;
+  c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, w, h);
+  const n = Pl.state === 'demo' ? null : currentNote();
+  const left = 44, right = w - 14, frets = 4, fw = (right - left) / frets;
+  const top = 14, bot = h - 14, sg = (bot - top) / 5;
+  c.fillStyle = COL.fg; c.fillRect(left - 4, top - 4, 5, bot - top + 8);     // порожек
+  c.strokeStyle = COL.line; c.lineWidth = 2;
+  for (let f = 1; f <= frets; f++) { const x = left + f * fw; c.beginPath(); c.moveTo(x, top - 3); c.lineTo(x, bot + 3); c.stroke(); }
+  c.fillStyle = COL.muted; c.font = '500 10px JetBrains Mono, monospace'; c.textAlign = 'center'; c.textBaseline = 'alphabetic';
+  for (let f = 1; f <= frets; f++) c.fillText(String(f), left + (f - 0.5) * fw, h - 2);
+  for (let s = 1; s <= 6; s++) {
+    const yy = top + (s - 1) * sg;
+    c.strokeStyle = n && n.s === s ? strColor(s) : COL.muted; c.globalAlpha = n && n.s === s ? 1 : 0.4;
+    c.lineWidth = 0.8 + s * 0.35; c.beginPath(); c.moveTo(left, yy); c.lineTo(right, yy); c.stroke(); c.globalAlpha = 1;
+  }
+  if (!n) return;
+  const yy = top + (n.s - 1) * sg;
+  if (n.f === 0) {
+    c.strokeStyle = strColor(n.s); c.lineWidth = 2.5; c.beginPath(); c.arc(22, yy, 8, 0, Math.PI * 2); c.stroke();
+  } else {
+    const x = left + (n.f - 0.5) * fw;
+    c.fillStyle = strColor(n.s); c.beginPath(); c.arc(x, yy, 10, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#fff'; c.font = '700 11px JetBrains Mono, monospace'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillText(String(n.f), x, yy + 0.5);
+  }
+}
+function playerFrame(now) {
+  if (Pl.state === 'count') {
+    const k = Math.floor((now - Pl.countStart) / Pl.beat);
+    if (now >= Pl.t0 - 0.05) { Pl.state = 'run'; $('#pCount').hidden = true; }
+    else { $('#pCount').hidden = false; $('#pCount').textContent = String(Math.max(1, 4 - Math.max(0, k))); }
+  }
+  if (Pl.state === 'demo' && now > Pl.demoEnd) stopDemo();
+  if (Pl.state === 'run') judge(now);
+  // что слышит микрофон
+  const lvl = A.on ? Math.min(1, P.rms / (gate() * 8)) : 0;
+  $('#pMeter').style.width = (lvl * 100).toFixed(0) + '%';
+  const hear = $('#pHear'), tgt = currentNote();
+  if (!A.on) { hear.textContent = 'микрофон выкл.'; hear.className = 'hear-n'; }
+  else if (P.stable == null) { hear.textContent = 'тишина'; hear.className = 'hear-n'; }
+  else {
+    hear.textContent = 'слышу ' + ruName(P.stable);
+    hear.className = 'hear-n ' + (tgt && match(P.stable, tgt.midi) ? 'good' : 'bad');
+  }
+  drawHighway(now); drawFret(now);
+}
+$('#pBack').addEventListener('click', closeLesson);
+$('#pGo').addEventListener('click', () => {
+  if (Pl.state === 'run' || Pl.state === 'count') { stopRun(); reset(); }
+  else start();
+});
+$('#pDemo').addEventListener('click', demo);
+$('#pClick').addEventListener('change', e => { S.click = e.target.checked; save(); });
+$('#rAgain').addEventListener('click', () => start());
+$('#rPlan').addEventListener('click', () => { closeLesson(); show('today'); });
+$('#rNext').addEventListener('click', () => {
+  const next = FLAT[FLAT.indexOf(Pl.lesson) + 1];
+  if (next) openLesson(next);
+});
+
+/* ---------- Тюнер ---------- */
+let tuneTask = false, tuneSec = 0, tCents = 0;
+(() => {
+  let g = '';
+  for (let i = -50; i <= 50; i += 10) {
+    const a = (i / 50) * 60 * Math.PI / 180, r1 = 110, r2 = i === 0 ? 92 : 100;
+    g += '<line class="tick' + (i === 0 ? ' mid' : '') + '" x1="' + (180 + r1 * Math.sin(a)).toFixed(1) + '" y1="' + (150 - r1 * Math.cos(a)).toFixed(1) + '" x2="' + (180 + r2 * Math.sin(a)).toFixed(1) + '" y2="' + (150 - r2 * Math.cos(a)).toFixed(1) + '"/>';
+  }
+  $('#ticks').innerHTML = g;
+  const names = {6:'E', 5:'A', 4:'D', 3:'G', 2:'B', 1:'E'};
+  $('#strBtns').innerHTML = [6, 5, 4, 3, 2, 1].map(s => '<div class="str" data-s="' + s + '"><b>' + names[s] + '</b><span>' + s + '-я</span></div>').join('');
+})();
+function tunerUI() {
+  $('#tMic').textContent = A.on ? 'Выключить микрофон' : 'Включить микрофон';
+  if (!A.on) { $('#tNote').textContent = '–'; $('#tHz').textContent = 'Сыграй открытую струну'; $('#tState').textContent = ''; $('#tState').className = 't-state'; $('#needle').style.transform = 'rotate(0deg)'; document.querySelectorAll('.str').forEach(x => x.classList.remove('on')); }
+}
+$('#tMic').addEventListener('click', async () => {
+  if (A.on) micStop(); else await micStart($('#tErr'));
+  tunerUI();
+});
+function tunerFrame(now, dt) {
+  if (!A.on) return;
+  if (P.stable == null) return;
+  const m = P.stable;
+  let best = 1, bd = 99;
+  for (let s = 1; s <= 6; s++) { const d = Math.abs(m - OPEN[s]); if (d < bd) { bd = d; best = s; } }
+  let cents, label;
+  if (bd < 2.5) { cents = (m - OPEN[best]) * 100; label = OPEN[best]; }
+  else { cents = (m - Math.round(m)) * 100; label = Math.round(m); best = 0; }
+  cents = Math.max(-50, Math.min(50, cents));
+  tCents += (cents - tCents) * 0.35;
+  $('#tNote').innerHTML = '';
+  $('#tNote').append(document.createTextNode(ruName(label)));
+  const sm = document.createElement('small'); sm.textContent = sci(label); $('#tNote').append(sm);
+  $('#tHz').textContent = P.f.toFixed(1) + ' Гц · ' + (tCents > 0 ? '+' : '') + Math.round(tCents) + ' центов';
+  $('#needle').style.transform = 'rotate(' + (tCents / 50 * 60).toFixed(1) + 'deg)';
+  const st = $('#tState');
+  if (Math.abs(tCents) <= 5) { st.textContent = best ? 'Струна ' + best + ' настроена' : 'Точно'; st.className = 't-state ok'; }
+  else if (tCents < 0) { st.textContent = 'Ниже, подтяни'; st.className = 't-state low'; }
+  else { st.textContent = 'Выше, ослабь'; st.className = 't-state high'; }
+  document.querySelectorAll('.str').forEach(x => x.classList.toggle('on', Number(x.dataset.s) === best));
+}
+
+/* ---------- Метроном ---------- */
+const M = {on:false, next:0, beat:0, timer:null, flash:[]};
+function mRender() {
+  $('#mVal').textContent = S.bpm; $('#mRange').value = S.bpm;
+  $('#mBeats').innerHTML = Array.from({length:S.sig}, (_, i) => '<span class="beat' + (i === 0 ? ' first' : '') + '"></span>').join('');
+  document.querySelectorAll('#mSig button').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.b) === S.sig)));
+  $('#mStart').textContent = M.on ? 'Стоп' : 'Старт';
+}
+function mSet(v) { S.bpm = Math.max(40, Math.min(200, v)); save(); mRender(); }
+$('#mMinus').addEventListener('click', () => mSet(S.bpm - (S.bpm > 60 ? 5 : 2)));
+$('#mPlus').addEventListener('click', () => mSet(S.bpm + (S.bpm >= 60 ? 5 : 2)));
+$('#mRange').addEventListener('input', e => mSet(Number(e.target.value)));
+document.querySelectorAll('#mSig button').forEach(b => b.addEventListener('click', () => { S.sig = Number(b.dataset.b); M.beat = 0; save(); mRender(); }));
+$('#mStart').addEventListener('click', async () => {
+  if (M.on) { M.on = false; clearInterval(M.timer); mRender(); return; }
+  await ctx();
+  M.on = true; M.beat = 0; M.next = A.ctx.currentTime + 0.08; M.flash = [];
+  M.timer = setInterval(() => {
+    while (M.next < A.ctx.currentTime + 0.12) {
+      click(M.next, M.beat % S.sig === 0);
+      M.flash.push({t:M.next, i:M.beat % S.sig});
+      M.next += 60 / S.bpm; M.beat++;
+    }
+  }, 25);
+  mRender();
+});
+function metroFrame() {
+  if (!M.on || !A.ctx) return;
+  const t = A.ctx.currentTime;
+  while (M.flash.length > 1 && M.flash[1].t <= t) M.flash.shift();
+  const cur = M.flash[0] && M.flash[0].t <= t && t - M.flash[0].t < 0.12 ? M.flash[0].i : -1;
+  document.querySelectorAll('#mBeats .beat').forEach((b, i) => b.classList.toggle('on', i === cur));
+}
+
+/* ---------- Настройки ---------- */
+function setRender() {
+  $('#sens').value = S.sens; $('#sensVal').textContent = S.sens;
+  $('#unlock').checked = S.unlockAll;
+}
+$('#btnSet').addEventListener('click', () => { setRender(); $('#sheet').hidden = false; });
+$('#setClose').addEventListener('click', () => { $('#sheet').hidden = true; $('#resetAsk').hidden = true; $('#reset').hidden = false; });
+$('#sheet').addEventListener('click', e => { if (e.target.id === 'sheet') $('#setClose').click(); });
+$('#sens').addEventListener('input', e => { S.sens = Number(e.target.value); $('#sensVal').textContent = S.sens; save(); });
+$('#unlock').addEventListener('change', e => { S.unlockAll = e.target.checked; save(); if (view === 'lessons') renderLessons(); });
+$('#reset').addEventListener('click', () => { $('#reset').hidden = true; $('#resetAsk').hidden = false; });
+$('#resetNo').addEventListener('click', () => { $('#reset').hidden = false; $('#resetAsk').hidden = true; });
+$('#resetYes').addEventListener('click', () => {
+  S = {lessons:{}, days:{}, sens:S.sens, bpm:S.bpm, sig:S.sig, unlockAll:false, click:true};
+  save(); $('#setClose').click(); show(view);
+});
+
+/* ---------- Главный цикл ---------- */
+let lastT = performance.now() / 1000, saveAcc = 0;
+function loop() {
+  const now = performance.now() / 1000, dt = Math.min(0.25, now - lastT);
+  lastT = now;
+  detect(now);
+  if (Pl.open) playerFrame(now);
+  else if (view === 'tuner') tunerFrame(now, dt);
+  metroFrame();
+  // засчитываем время занятия: идёт урок, работает тюнер или метроном
+  const active = (Pl.open && (Pl.state === 'run' || Pl.state === 'count' || Pl.state === 'demo')) || (view === 'tuner' && A.on && !Pl.open) || M.on;
+  if (active && !document.hidden) {
+    day().sec += dt; saveAcc += dt;
+    if (view === 'tuner' && A.on && !Pl.open && tuneTask) { tuneSec += dt; if (tuneSec > 25) { markDone('tune'); tuneTask = false; } }
+    if (saveAcc > 5) { saveAcc = 0; save(); }
+  }
+  requestAnimationFrame(loop);
+}
+window.addEventListener('pagehide', save);
+document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+const mq = window.matchMedia('(prefers-color-scheme: dark)');
+if (mq.addEventListener) mq.addEventListener('change', readColors);
+
+readColors(); mRender(); renderToday();
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
