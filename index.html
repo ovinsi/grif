@@ -70,6 +70,8 @@ p{margin:0}
 .streak{display:inline-flex;gap:6px;align-items:center;font:500 14px var(--f-body);color:var(--muted)}
 .streak b{color:var(--gold);font:700 14px var(--f-mono)}
 
+.cur{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--surface);border-radius:var(--r);padding:10px 10px 10px 16px}
+.cur select{font:600 15px var(--f-body);color:var(--fg);background:var(--surface-2);border:0;border-radius:10px;padding:10px 12px;min-width:0;max-width:70%}
 .plan{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px;counter-reset:p}
 .pi{display:flex;align-items:center;gap:14px;background:var(--surface);border-radius:var(--r);padding:14px;counter-increment:p;width:100%;text-align:left}
 .pi:active{transform:scale(.99)}
@@ -234,6 +236,10 @@ input[type=range]{width:100%;accent-color:var(--accent)}
         <span class="streak">Дней подряд: <b id="streak">0</b></span>
       </div>
     </div>
+    <label class="cur" for="curStage">
+      <span class="eyebrow">Мой этап</span>
+      <select id="curStage"></select>
+    </label>
     <div>
       <div class="eyebrow" style="margin-bottom:10px">План на сегодня</div>
       <ol class="plan" id="plan"></ol>
@@ -814,6 +820,9 @@ function renderToday() {
   const plan = planFor(), left = plan.filter(p => !d.done.includes(p.key)).length;
   $('#dayNote').textContent = frac >= 1 && !left ? 'Занятие на сегодня выполнено' : left ? 'Осталось шагов: ' + left : 'План выполнен, можно повторить что угодно';
   $('#streak').textContent = streak();
+  const sel = $('#curStage');
+  sel.innerHTML = STAGES.filter(st => !st.soon).map(st => '<option value="' + st.n + '">' + st.n + ' · ' + st.title + '</option>').join('');
+  sel.value = String(S.cur || 1);
   $('#plan').innerHTML = '';
   plan.forEach(p => {
     const li = document.createElement('li');
@@ -833,6 +842,7 @@ function renderToday() {
     li.appendChild(b); $('#plan').appendChild(li);
   });
 }
+$('#curStage').addEventListener('change', e => { S.cur = Number(e.target.value); save(); renderToday(); });
 function markDone(key) {
   const d = day();
   if (key && !d.done.includes(key)) { d.done.push(key); save(); }
