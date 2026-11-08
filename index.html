@@ -385,6 +385,65 @@ const ruName = m => RU[pc(m)];
 const sci = m => NN[pc(m)] + (Math.floor(Math.round(m) / 12) - 1);
 const FINGER = ['открытая', 'указательный', 'средний', 'безымянный', 'мизинец'];
 
+/* Открытые аккорды: лады и пальцы по струнам от 6-й к 1-й, x — струну не играем */
+const CHORDS = {
+  Em:{frets:'022000', fing:'023000', ru:'ми минор', hint:'два пальца на 2-м ладу, все 6 струн',
+      tip:'Средний палец на 2-й лад 5-й струны, безымянный на 2-й лад 4-й. Бьём все шесть струн.'},
+  Am:{frets:'x02210', fing:'x02310', ru:'ля минор', hint:'6-ю струну не задеваем',
+      tip:'Форма как у Em, только на струну ниже, и указательный на 1-й лад 2-й струны. 6-ю струну не задеваем.'},
+  E: {frets:'022100', fing:'023100', ru:'ми мажор', hint:'Em плюс указательный на 3-й струне',
+      tip:'Это Em, к которому добавлен указательный на 1-й лад 3-й струны. Бьём все шесть.'},
+  A: {frets:'x02220', fing:'x01230', ru:'ля мажор', hint:'три пальца в ряд на 2-м ладу',
+      tip:'Три пальца в ряд на 2-м ладу 4-й, 3-й и 2-й струн. Тесно, это нормально. 6-ю не задеваем.'},
+  D: {frets:'xx0232', fing:'xx0132', ru:'ре мажор', hint:'бьём с 4-й струны',
+      tip:'Треугольник на трёх тонких струнах. Бьём только с 4-й струны, две толстые не задеваем.'},
+  C: {frets:'x32010', fing:'x32010', ru:'до мажор', hint:'лесенка, 6-ю не задеваем',
+      tip:'Лесенка: безымянный на 3-й лад 5-й струны, средний на 2-й лад 4-й, указательный на 1-й лад 2-й.'},
+  G: {frets:'320003', fing:'210003', ru:'соль мажор', hint:'крайние струны на 3-м ладу',
+      tip:'Средний на 3-й лад 6-й струны, указательный на 2-й лад 5-й, безымянный на 3-й лад 1-й. Все шесть струн.'}
+};
+const chordMidis = name => [...CHORDS[name].frets].map((f, i) => f === 'x' ? null : OPEN[6 - i] + Number(f)).filter(m => m != null);
+
+/* Шаблоны трезвучий для распознавания: основной тон, терция, квинта плюс слабые обертоны */
+const TRI = [];
+for (let r = 0; r < 12; r++) {
+  TRI.push({name:NN[r], pcs:[r, (r + 4) % 12, (r + 7) % 12]});
+  TRI.push({name:NN[r] + 'm', pcs:[r, (r + 3) % 12, (r + 7) % 12]});
+}
+TRI.forEach(t => {
+  const v = new Float32Array(12);
+  t.pcs.forEach(p => { v[p] += 1; v[(p + 7) % 12] += 0.3; v[(p + 4) % 12] += 0.12; });
+  const n = Math.hypot(...v);
+  for (let i = 0; i < 12; i++) v[i] /= n;
+  t.v = v;
+});
+const TRI_BY = Object.fromEntries(TRI.map(t => [t.name, t]));
+function chScore(ch, name) {
+  const t = TRI_BY[name]; let dot = 0, n = 0;
+  for (let i = 0; i < 12; i++) { dot += ch[i] * t.v[i]; n += ch[i] * ch[i]; }
+  return n ? dot / Math.sqrt(n) : 0;
+}
+function chBest(ch) {
+  let b = null, bs = -1;
+  for (const t of TRI) { const s = chScore(ch, t.name); if (s > bs) { bs = s; b = t.name; } }
+  return {name:b, score:bs};
+}
+function chordOK(ch, name) {
+  const s = chScore(ch, name), b = chBest(ch);
+  return s >= 0.6 && (b.name === name || s >= b.score - 0.015);
+}
+
+const C = (id, title, sub, mode, bpm, items, tip, extra) => Object.assign({id, title, sub, mode, bpm, items, tip}, extra || {});
+const cw = s => s.trim().split(/\s+/).map(chord => ({chord, d:1}));
+const cyc = (list, n) => Array.from({length:n}, (_, i) => ({chord:list[i % list.length], d:1}));
+// Бой: схема на такт 4/4 восьмыми, D — вниз, U — вверх, '-' — пропуск
+function strum(chords, pat) {
+  const out = [];
+  chords.forEach((chord, b) => [...pat].forEach((x, i) => { if (x === 'D' || x === 'U') out.push({chord, dir:x, beat:b * 4 + i * 0.5, d:0.5}); }));
+  return out;
+}
+const SW = 'Одна минута. Поставь аккорд, ударь один раз, меняй на другой. Засчитывается только чисто прозвучавший аккорд.';
+
 // "1:0 2:3/2" → [{s:1,f:0,d:1},{s:2,f:3,d:2}]
 const seq = str => str.trim().split(/\s+/).map(t => {
   const [sf, d] = t.split('/'); const [s, f] = sf.split(':').map(Number);
@@ -445,16 +504,50 @@ const STAGES = [
       '1:0 1:0 1:1 1:3 1:3 1:1 1:0 2:3 2:1 2:1 2:3 1:0 1:0/1.5 2:3/0.5 2:3/2 1:0 1:0 1:1 1:3 1:3 1:1 1:0 2:3 2:1 2:1 2:3 1:0 2:3/1.5 2:1/0.5 2:1/2',
       'Почти вся мелодия на первой струне. Ноты с точкой чуть длиннее, после них короткая.')
   ]},
-  {n:4, title:'Все шесть струн', sub:'Басовые струны и ноты на них', soon:true},
-  {n:5, title:'Первые аккорды', sub:'Em, Am, C, G, D', soon:true},
-  {n:6, title:'Смена аккордов', sub:'Переставляем пальцы на время', soon:true},
-  {n:7, title:'Бой', sub:'Ритм правой рукой под метроном', soon:true},
+  {n:4, title:'Аккорды', sub:'Em, Am, E, потом A, D, C, G', lessons:[
+    C('4-1','Аккорд Em','ми минор','cwait',0, cw(rep('Em',6)), CHORDS.Em.tip + ' Ударь сверху вниз и дай прозвучать.'),
+    C('4-2','Аккорд Am','ля минор','cwait',0, cw(rep('Am',6)), CHORDS.Am.tip),
+    C('4-3','Аккорд E','ми мажор','cwait',0, cw(rep('E',6)), CHORDS.E.tip),
+    C('4-4','Em, Am и E','По очереди','cwait',0, cw('Em Em Am Am E E Am Am Em'),
+      'Переставляй пальцы и бей, только когда все пальцы на месте. Скорость придёт сама.'),
+    C('4-5','Аккорд A','ля мажор','cwait',0, cw(rep('A',6)), CHORDS.A.tip),
+    C('4-6','Аккорд D','ре мажор','cwait',0, cw(rep('D',6)), CHORDS.D.tip),
+    C('4-7','Аккорд C','до мажор','cwait',0, cw(rep('C',6)), CHORDS.C.tip),
+    C('4-8','Аккорд G','соль мажор','cwait',0, cw(rep('G',6)), CHORDS.G.tip),
+    C('4-9','Проверка этапа','Все семь аккордов','cwait',0, cw('Em Am E A D C G Em C G D Am'),
+      'Все аккорды этапа вперемешку. Две звезды открывают смену аккордов на время.')
+  ]},
+  {n:5, title:'Смена аккордов', sub:'Минута на пару аккордов, бьём рекорд', lessons:[
+    C('5-1','Em ↔ Am','Самая простая пара','cchange',0, cyc(['Em','Am'],200), SW + ' Пальцы для Em и Am одинаковые, просто сдвигаются на струну.', {goals:[10,18,26]}),
+    C('5-2','Am ↔ E','Одна форма, другие струны','cchange',0, cyc(['Am','E'],200), SW + ' Форма пальцев та же, вся рука сдвигается на струну вверх.', {goals:[10,18,26]}),
+    C('5-3','Em ↔ G','','cchange',0, cyc(['Em','G'],200), SW, {goals:[8,15,22]}),
+    C('5-4','Am ↔ C','','cchange',0, cyc(['Am','C'],200), SW + ' Безымянный и средний переходят, указательный остаётся на месте.', {goals:[8,15,22]}),
+    C('5-5','D ↔ A','','cchange',0, cyc(['D','A'],200), SW, {goals:[8,15,22]}),
+    C('5-6','C ↔ G','','cchange',0, cyc(['C','G'],200), SW, {goals:[8,14,20]}),
+    C('5-7','G ↔ D','','cchange',0, cyc(['G','D'],200), SW + ' Безымянный на 1-й струне можно не снимать: он на 3-м ладу в обоих аккордах.', {goals:[8,14,20]}),
+    C('5-8','Четыре аккорда','G → Em → C → D','cchange',0, cyc(['G','Em','C','D'],200), SW + ' Аккорды идут по кругу.', {goals:[8,14,20]})
+  ].map(l => (l.sub = l.sub || 'Минута на смены', l))},
+  {n:6, title:'Бой', sub:'Ритм правой рукой под щелчки', lessons:[
+    C('6-1','Вниз на четыре','Em и Am, четверти','cstrum',70, strum(['Em','Em','Am','Am','Em','Em','Am','Am'],'D-D-D-D-'),
+      'Четыре удара вниз на такт, на каждый щелчок. Рука двигается от локтя, кисть свободная.', {beats:32}),
+    C('6-2','Вниз-вверх','Восьмые, рука как маятник','cstrum',60, strum(['Em','Em','Am','Am','Em','Em','Am','Am'],'DUDUDUDU'),
+      'Вниз на щелчок, вверх между щелчками. Вверх достаточно задеть три-четыре тонкие струны.', {beats:32}),
+    C('6-3','Вниз, вниз-вверх','Am и E','cstrum',65, strum(['Am','Am','E','E','Am','Am','E','E'],'D-DUD-DU'),
+      'Схема на такт: вниз, вниз-вверх, вниз, вниз-вверх. Считай вслух «раз, два-и, три, четыре-и».', {beats:32}),
+    C('6-4','Бой с пропуском','C, G, Am, Em','cstrum',65, strum(['C','C','G','G','Am','Am','Em','Em'],'D-DU-UDU'),
+      'На пропуске рука всё равно идёт вниз, только не задевает струны. Так ритм не сбивается.', {beats:32}),
+    C('6-5','Смена каждый такт','G, Em, C, D','cstrum',70, strum(['G','Em','C','D','G','Em','C','D'],'D-DU-UDU'),
+      'Последний удар вверх перед сменой можно сыграть по открытым струнам, пока пальцы переставляются.', {beats:32}),
+    C('6-6','Проверка этапа','Всё вместе, 80 ударов','cstrum',80, strum(['Am','C','G','Em','Am','C','E','Am'],'D-DU-UDU'),
+      'Контрольная этапа: бой с пропуском и смена каждый такт.', {beats:32})
+  ]},
+  {n:7, title:'Все шесть струн', sub:'Басовые струны и ноты на них', soon:true},
   {n:8, title:'Перебор', sub:'Играем аккорды по струнам', soon:true}
 ];
 const FLAT = [];
 STAGES.forEach(st => (st.lessons || []).forEach(l => {
   l.stage = st.n;
-  l.notes = seq(l.tab);
+  l.notes = l.items || seq(l.tab);
   FLAT.push(l);
 }));
 
@@ -483,7 +576,8 @@ function streak() {
   return n;
 }
 const starsOf = id => (S.lessons[id] || {}).stars || 0;
-const unlocked = i => S.unlockAll || i === 0 || starsOf(FLAT[i - 1].id) >= 2;
+// Первый урок каждого этапа открыт всегда, дальше по 2 звезды за прошлый урок
+const unlocked = i => S.unlockAll || i === 0 || FLAT[i - 1].stage !== FLAT[i].stage || starsOf(FLAT[i - 1].id) >= 2;
 const GOAL_MIN = 20;
 
 /* ---------- Звук и микрофон ---------- */
@@ -515,8 +609,29 @@ async function micStart(errEl) {
 }
 function attach(src) {
   A.an = A.ctx.createAnalyser(); A.an.fftSize = 2048;
-  src.connect(A.an);
-  A.src = src; A.buf = new Float32Array(A.an.fftSize); A.on = true;
+  A.an2 = A.ctx.createAnalyser(); A.an2.fftSize = 8192; A.an2.smoothingTimeConstant = 0;   // спектр для аккордов
+  src.connect(A.an); src.connect(A.an2);
+  A.src = src; A.buf = new Float32Array(A.an.fftSize); A.fbuf = new Float32Array(A.an2.frequencyBinCount); A.on = true;
+  chromaBins(A.ctx.sampleRate, A.an2.fftSize);
+}
+// Какие частотные полосы в какую ноту складывать (75–1300 Гц), вес выравнивает высокие ноты, где полос больше
+let CB = [];
+function chromaBins(sr, N) {
+  CB = [];
+  const step = sr / N;
+  for (let k = 1; k < N / 2; k++) {
+    const f = k * step;
+    if (f < 75) continue;
+    if (f > 1300) break;
+    const m = f2m(f), r = Math.round(m), w = 1 - 2 * Math.abs(m - r);
+    if (w > 0) CB.push([k, ((r % 12) + 12) % 12, w / Math.max(1, f * 0.0595 / step)]);
+  }
+}
+function chromaFrame() {
+  A.an2.getFloatFrequencyData(A.fbuf);
+  const c = new Float32Array(12);
+  for (const [k, pcl, w] of CB) { const db = A.fbuf[k]; if (db > -100) c[pcl] += w * Math.pow(10, db / 20); }
+  return c;
 }
 function micStop() {
   if (A.stream) A.stream.getTracks().forEach(t => t.stop());
@@ -525,13 +640,18 @@ function micStop() {
   A.stream = null; A.src = null; A.on = false;
   resetP();
 }
-// Для проверки без гитары: в консоли gfTestTone(64) — синусоида вместо микрофона, gfTestTone() — выключить
+// Для проверки без гитары: в консоли gfTestTone(64) или gfTestTone([40,47,52,55,59,64]) — тон вместо микрофона, gfTestTone() — выключить
 window.gfTestTone = async m => {
   micStop(); await ctx();
   if (m == null) return;
-  const o = A.ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = m2f(m); o.start();
-  attach(o);
-  return {setNote: n => { o.frequency.value = m2f(n); P.onsetT = performance.now() / 1000; P.mh.length = 0; P.stable = null; }};
+  const g = A.ctx.createGain(); g.gain.value = 0.3;
+  let osc = [];
+  const set = n => {
+    osc.forEach(o => o.stop());
+    osc = [].concat(n).map(x => { const o = A.ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = m2f(x); o.connect(g); o.start(); return o; });
+  };
+  set(m); attach(g);
+  return {setNote: n => { set(n); P.onsetT = performance.now() / 1000; P.mh.length = 0; P.stable = null; P.chroma.fill(0); P.chromaN = 0; }};
 };
 
 /* Определение высоты: YIN по окну 1024 отсчёта, диапазон 70–1100 Гц */
@@ -563,8 +683,8 @@ function yin(buf, sr) {
   return sr / (tau + (Math.abs(sh) < 1 ? sh : 0));
 }
 
-const P = {rms:0, m:null, stable:null, onsetT:-10, hist:[], mh:[]};
-function resetP() { P.rms = 0; P.m = null; P.stable = null; P.hist.length = 0; P.mh.length = 0; }
+const P = {rms:0, m:null, stable:null, onsetT:-10, hist:[], mh:[], chroma:new Float32Array(12), chromaN:0, chLive:new Float32Array(12), chLiveOn:false};
+function resetP() { P.rms = 0; P.m = null; P.stable = null; P.hist.length = 0; P.mh.length = 0; P.chroma.fill(0); P.chromaN = 0; P.chLive.fill(0); P.chLiveOn = false; }
 const gate = () => 0.03 * Math.pow(0.68, S.sens - 1);
 let lastDet = 0;
 function detect(now) {
@@ -578,11 +698,15 @@ function detect(now) {
   h.push(r); if (h.length > 8) h.shift();
   if (r > g && h.length > 3 && now - P.onsetT > 0.13) {
     const ref = Math.min(...h.slice(0, h.length - 2));
-    if (r > ref * 2) { P.onsetT = now; P.mh.length = 0; P.stable = null; }
+    if (r > ref * 2) { P.onsetT = now; P.mh.length = 0; P.stable = null; P.chroma.fill(0); P.chromaN = 0; }
   }
   P.rms = r;
-  if (r < g) { P.m = null; P.stable = null; P.mh.length = 0; return; }
+  if (r < g) { P.m = null; P.stable = null; P.mh.length = 0; P.chLiveOn = false; return; }
   if (now - P.onsetT < 0.05) return;   // в окне анализатора ещё звучит прошлая нота
+  const ch = chromaFrame();
+  for (let i = 0; i < 12; i++) P.chLive[i] = P.chLive[i] * 0.7 + ch[i] * 0.3;
+  P.chLiveOn = true;
+  if (now - P.onsetT < 0.6) { for (let i = 0; i < 12; i++) P.chroma[i] += ch[i]; P.chromaN++; }
   const f = yin(A.buf, A.ctx.sampleRate);
   if (f < 0) { P.m = null; P.stable = null; P.mh.length = 0; return; }
   P.m = f2m(f); P.f = f;
@@ -625,10 +749,18 @@ function pluckBuf(m) {   // Карплус-Стронг
   }
   return (pluckCache[m] = b);
 }
-function pluck(m, at) {
+function pluck(m, at, vol) {
   const s = A.ctx.createBufferSource(); s.buffer = pluckBuf(m);
-  s.connect(A.ctx.destination); s.start(at);
+  if (vol) { const g = A.ctx.createGain(); g.gain.value = vol; s.connect(g).connect(A.ctx.destination); }
+  else s.connect(A.ctx.destination);
+  s.start(at);
   return s;
+}
+// Удар по аккорду: вниз — от баса, вверх — только тонкие струны от 1-й
+function strumChord(name, dir, at) {
+  let ms = chordMidis(name);
+  if (dir === 'U') ms = ms.slice(-4).reverse();
+  return ms.map((m, i) => pluck(m, at + i * 0.014, 0.45));
 }
 
 /* ---------- Навигация ---------- */
@@ -651,20 +783,22 @@ const starsHTML = n => [1, 2, 3].map(i => STAR.replace('<svg', '<svg class="' + 
 const MONTHS = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
 const WD = ['воскресенье','понедельник','вторник','среда','четверг','пятница','суббота'];
 
+// План строится от текущего этапа: самого дальнего, который открывали. Сменился этап — план пересобирается
 function planFor() {
-  const d = day();
-  if (d.plan) return d.plan;
+  const d = day(), cur = S.cur || 1;
+  if (d.plan && (d.planStage || 1) === cur) return d.plan;
+  if (d.plan) d.done = d.done.filter(k => k === 'tune');
   const items = [{key:'tune', kind:'tune', label:'Настройка', title:'Настрой гитару', sub:'По тюнеру, все шесть струн', mins:2}];
-  const passed = FLAT.filter(l => starsOf(l.id) >= 2);
-  const next = FLAT.find(l => starsOf(l.id) < 2);
+  const passed = FLAT.filter(l => l.stage <= cur && starsOf(l.id) >= 2);
+  const next = FLAT.find(l => l.stage >= cur && starsOf(l.id) < 2);
   const last = passed[passed.length - 1];
   if (last) items.push({key:'warm', kind:'lesson', id:last.id, label:'Разминка', mins:5});
   if (next) items.push({key:'new', kind:'lesson', id:next.id, label:'Новый урок', mins:10});
-  const weak = passed.filter(l => l !== last && starsOf(l.id) < 3).sort((a, b) => starsOf(a.id) - starsOf(b.id))[0];
+  const weak = passed.filter(l => l !== last && l.stage === cur && starsOf(l.id) < 3).sort((a, b) => starsOf(a.id) - starsOf(b.id))[0];
   if (weak) items.push({key:'fix', kind:'lesson', id:weak.id, label:'Закрепление', mins:5});
   else if (next) items.push({key:'fix', kind:'lesson', id:next.id, label:'Ещё подход', mins:5});
   else if (last) items.push({key:'fix', kind:'lesson', id:FLAT[Math.max(0, FLAT.length - 2)].id, label:'Закрепление', mins:5});
-  d.plan = items; save();
+  d.plan = items; d.planStage = cur; save();
   return items;
 }
 function renderToday() {
@@ -724,7 +858,7 @@ function renderLessons() {
       b.innerHTML = '<span class="li-body"><span class="li-title"></span><span class="li-sub"></span></span><span class="li-mode"></span>' + (open ? '<span class="stars">' + starsHTML(starsOf(l.id)) + '</span>' : LOCK);
       b.querySelector('.li-title').textContent = l.title;
       b.querySelector('.li-sub').textContent = l.sub;
-      b.querySelector('.li-mode').textContent = l.mode === 'wait' ? 'ЖДЁТ' : l.bpm + ' BPM';
+      b.querySelector('.li-mode').textContent = {wait:'ЖДЁТ', cwait:'АККОРД', cchange:'1 МИН'}[l.mode] || l.bpm + ' BPM';
       b.addEventListener('click', () => openLesson(l));
       ls.appendChild(b);
     });
@@ -733,7 +867,7 @@ function renderLessons() {
 }
 
 /* ---------- Плеер урока ---------- */
-const Pl = {open:false, lesson:null, planKey:null, state:'idle', notes:[], idx:0, mistakes:0, scroll:0, t0:0, sched:[], demoEnd:0, hitFlash:0, missFlash:0, armT:0, usedOnset:-1, seenOnset:-1, wrongCounted:false, prevMidi:null, endT:0};
+const Pl = {open:false, lesson:null, planKey:null, state:'idle', notes:[], idx:0, mistakes:0, scroll:0, t0:0, sched:[], demoEnd:0, hitFlash:0, missFlash:0, armT:0, usedOnset:-1, seenOnset:-1, wrongCounted:false, prevMidi:null, endT:0, countN:4};
 const hw = $('#hw'), hx = hw.getContext('2d'), fb = $('#fb'), fx = fb.getContext('2d');
 let COL = {};
 function readColors() {
@@ -746,15 +880,22 @@ function fit(c) {
   if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
   return {w:r.width, h:r.height, dpr};
 }
+const isChord = l => l.mode[0] === 'c';
+const isTimed = l => l.mode === 'tempo' || l.mode === 'cstrum';
+const CHANGE_SEC = 60;
+const MODE_TXT = {wait:'в своём темпе', cwait:'в своём темпе', cchange:'минута на смены'};
+const CH_COL = {Em:'s3', Am:'s1', E:'s2', A:'s4', D:'s5', C:'s6', G:'accent'};
+const chordColor = name => COL[CH_COL[name]] || COL.accent;
 
 function openLesson(l, planKey) {
   Pl.open = true; Pl.lesson = l; Pl.planKey = planKey || null;
+  if (l.stage > (S.cur || 1)) { S.cur = l.stage; save(); }
   $('#player').hidden = false;
   $('#pTitle').textContent = l.title;
-  $('#pSub').textContent = 'Этап ' + l.stage + ' · ' + (l.mode === 'wait' ? 'в своём темпе' : l.bpm + ' ударов в минуту');
+  $('#pSub').textContent = 'Этап ' + l.stage + ' · ' + (MODE_TXT[l.mode] || l.bpm + ' ударов в минуту');
   $('#pTip').textContent = l.tip;
   $('#pStars').innerHTML = starsHTML(starsOf(l.id));
-  $('#pClickWrap').hidden = l.mode === 'wait';
+  $('#pClickWrap').hidden = !isTimed(l);
   $('#pClick').checked = S.click;
   $('#pErr').hidden = true;
   readColors();
@@ -771,8 +912,13 @@ function closeLesson() {
 function reset() {
   const l = Pl.lesson;
   let beat = 0;
-  Pl.notes = l.notes.map(n => { const o = {s:n.s, f:n.f, d:n.d, midi:OPEN[n.s] + n.f, beat, st:'pending', fx:0}; beat += n.d; return o; });
-  Pl.totalBeats = beat;
+  Pl.notes = l.notes.map(n => {
+    const o = Object.assign({}, n, {st:'pending', fx:0, wrong:0});
+    if (o.beat == null) { o.beat = beat; beat += o.d || 1; } else beat = Math.max(beat, o.beat + (o.d || 0.5));
+    if (o.s) o.midi = OPEN[o.s] + o.f;
+    return o;
+  });
+  Pl.totalBeats = l.beats || beat;
   Pl.idx = 0; Pl.mistakes = 0; Pl.scroll = 0; Pl.state = 'idle'; Pl.prevMidi = null;
   Pl.usedOnset = P.onsetT; Pl.armT = performance.now() / 1000;
   $('#pRes').hidden = true; $('#pCount').hidden = true;
@@ -792,11 +938,15 @@ async function start() {
   const l = Pl.lesson, now = performance.now() / 1000;
   Pl.armT = now; Pl.usedOnset = P.onsetT; Pl.seenOnset = P.onsetT;
   $('#pGo').textContent = 'Стоп'; $('#pDemo').disabled = true;
-  if (l.mode === 'wait') { Pl.state = 'run'; return; }
+  if (l.mode === 'wait' || l.mode === 'cwait') { Pl.state = 'run'; return; }
+  if (l.mode === 'cchange') {      // 3 секунды отсчёта, потом минута
+    Pl.beat = 1; Pl.countN = 3; Pl.countStart = now; Pl.t0 = now + 3; Pl.endT = Pl.t0 + CHANGE_SEC;
+    Pl.state = 'count'; return;
+  }
   const beat = 60 / l.bpm, lead = 0.25, countIn = 4;
   const at0 = A.ctx.currentTime + lead;
   Pl.t0 = now + lead + countIn * beat;          // время первой ноты по часам страницы
-  Pl.beat = beat;
+  Pl.beat = beat; Pl.countN = countIn;
   const total = countIn + Math.ceil(Pl.totalBeats);
   for (let i = 0; i < total; i++) {
     if (i < countIn || S.click) Pl.sched.push(click(at0 + i * beat, i % 4 === 0));
@@ -807,13 +957,19 @@ async function start() {
 }
 function finish() {
   stopRun();
-  const n = Pl.notes.length, hits = Pl.notes.filter(x => x.st === 'hit').length;
-  const acc = Pl.lesson.mode === 'wait' ? hits / (hits + Pl.mistakes) : hits / n;
-  const stars = acc >= 0.93 ? 3 : acc >= 0.8 ? 2 : acc >= 0.6 ? 1 : 0;
-  const id = Pl.lesson.id, rec = S.lessons[id] || {stars:0, best:0};
-  const ni = FLAT.indexOf(Pl.lesson) + 1;
+  const l = Pl.lesson, n = Pl.notes.length, hits = Pl.notes.filter(x => x.st === 'hit').length;
+  let acc = null, stars;
+  if (l.mode === 'cchange') {
+    const g = l.goals;
+    stars = hits >= g[2] ? 3 : hits >= g[1] ? 2 : hits >= g[0] ? 1 : 0;
+  } else {
+    acc = (l.mode === 'wait' || l.mode === 'cwait') ? hits / Math.max(1, hits + Pl.mistakes) : hits / n;
+    stars = acc >= 0.93 ? 3 : acc >= 0.8 ? 2 : acc >= 0.6 ? 1 : 0;
+  }
+  const id = l.id, rec = S.lessons[id] || {stars:0, best:0}, prevBest = rec.best;
+  const ni = FLAT.indexOf(l) + 1;
   const wasLocked = ni < FLAT.length && !unlocked(ni);
-  rec.stars = Math.max(rec.stars, stars); rec.best = Math.max(rec.best, Math.round(acc * 100)); rec.plays = (rec.plays || 0) + 1;
+  rec.stars = Math.max(rec.stars, stars); rec.best = Math.max(rec.best, acc == null ? hits : Math.round(acc * 100)); rec.plays = (rec.plays || 0) + 1;
   S.lessons[id] = rec;
   // отметить шаг плана: явный из плана или первый невыполненный с этим уроком
   const d = day(), plan = planFor();
@@ -822,30 +978,54 @@ function finish() {
   save();
   Pl.state = 'done';
   $('#rStars').innerHTML = starsHTML(stars);
-  $('#rPct').textContent = Math.round(acc * 100) + '%';
-  const i = FLAT.indexOf(Pl.lesson), next = FLAT[i + 1];
-  let txt = Pl.lesson.mode === 'wait'
-    ? 'Сыграно ' + hits + ' нот, ошибок: ' + Pl.mistakes + '.'
-    : 'Попал в ' + hits + ' из ' + n + ' нот.';
+  const next = FLAT[ni];
+  let txt;
+  if (l.mode === 'cchange') {
+    $('#rPct').textContent = hits;
+    txt = 'Чистых смен за минуту. ' + (prevBest && hits > prevBest ? 'Новый рекорд! ' : 'Рекорд: ' + rec.best + '. ');
+    const goal = l.goals.find(g => g > hits);
+    if (goal) txt += 'Следующая звезда с ' + goal + '.';
+  } else {
+    $('#rPct').textContent = Math.round(acc * 100) + '%';
+    if (l.mode === 'wait' || l.mode === 'cwait') txt = (l.mode === 'cwait' ? 'Сыграно аккордов: ' : 'Сыграно нот: ') + hits + ', ошибок: ' + Pl.mistakes + '.';
+    else txt = 'Попал в ' + hits + ' из ' + n + (l.mode === 'cstrum' ? ' ударов.' : ' нот.');
+    if (stars < 2) txt += ' Нужно 80%, чтобы открыть следующий урок.';
+  }
   if (stars >= 2 && next && wasLocked) txt += ' Открыт урок «' + next.title + '».';
-  else if (stars < 2) txt += ' Нужно 80%, чтобы открыть следующий урок.';
   $('#rTxt').textContent = txt;
-  $('#rNext').hidden = !(next && unlocked(i + 1));
+  $('#rNext').hidden = !(next && unlocked(ni));
   $('#pRes').hidden = false;
   $('#pStars').innerHTML = starsHTML(rec.stars);
   $('#pGo').textContent = 'Начать'; $('#pDemo').disabled = false;
 }
 function updateScore() {
+  const l = Pl.lesson;
+  if (!l) return;
   const hits = Pl.notes.filter(x => x.st === 'hit').length;
-  $('#pScore').textContent = 'Нот: ' + hits + ' / ' + Pl.notes.length + (Pl.lesson && Pl.lesson.mode === 'wait' ? ' · ошибок: ' + Pl.mistakes : '');
+  let t;
+  if (l.mode === 'cchange') {
+    const left = Pl.state === 'run' ? Math.max(0, Math.ceil(Pl.endT - performance.now() / 1000)) : CHANGE_SEC;
+    t = 'Смен: ' + hits + ' · осталось ' + Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
+  } else if (l.mode === 'wait' || l.mode === 'cwait') {
+    t = (l.mode === 'cwait' ? 'Аккордов: ' : 'Нот: ') + hits + ' / ' + Pl.notes.length + ' · ошибок: ' + Pl.mistakes;
+  } else t = (l.mode === 'cstrum' ? 'Ударов: ' : 'Нот: ') + hits + ' / ' + Pl.notes.length;
+  const el = $('#pScore');
+  if (el.textContent !== t) el.textContent = t;
 }
 function currentNote() {
-  if (Pl.lesson.mode === 'wait') return Pl.notes[Pl.idx];
+  if (Pl.state === 'demo') return Pl.notes[0];
+  if (!isTimed(Pl.lesson)) return Pl.notes[Pl.idx];
   return Pl.notes.find(n => n.st === 'pending');
 }
 function updateTarget() {
   const n = currentNote();
   if (!n) { $('#pTarget').textContent = 'Готово'; $('#pTargetSub').textContent = ''; return; }
+  if (n.chord) {
+    const c = CHORDS[n.chord];
+    $('#pTarget').textContent = n.chord + ' · ' + c.ru;
+    $('#pTargetSub').textContent = n.dir ? (n.dir === 'D' ? 'удар вниз ↓' : 'удар вверх ↑') : c.hint;
+    return;
+  }
   $('#pTarget').textContent = ruName(n.midi) + ' · ' + n.s + '-я струна';
   $('#pTargetSub').textContent = n.f === 0 ? 'открытая струна, ничего не прижимаем' : n.f + '-й лад, ' + FINGER[n.f] + ' палец';
 }
@@ -855,10 +1035,16 @@ async function demo() {
   if (demoSrc.length) { stopDemo(); return; }
   await ctx();
   stopRun(); reset();
-  const l = Pl.lesson, bpm = l.mode === 'wait' ? 80 : l.bpm, beat = 60 / bpm, t = A.ctx.currentTime + 0.1;
-  Pl.notes.forEach(n => demoSrc.push(pluck(n.midi, t + n.beat * (l.mode === 'wait' ? 1 : 1) * beat)));
+  const l = Pl.lesson, byIdx = !isTimed(l);
+  const bpm = byIdx ? (isChord(l) ? 50 : 80) : l.bpm, beat = 60 / bpm, t = A.ctx.currentTime + 0.1;
+  const list = l.mode === 'cchange' ? Pl.notes.slice(0, 8) : Pl.notes;
+  list.forEach(n => {
+    const at = t + n.beat * beat;
+    if (n.chord) strumChord(n.chord, n.dir || 'D', at).forEach(s => demoSrc.push(s));
+    else demoSrc.push(pluck(n.midi, at));
+  });
   Pl.demoT0 = performance.now() / 1000 + 0.1; Pl.demoBeat = beat;
-  Pl.demoEnd = Pl.demoT0 + Pl.totalBeats * beat + 0.5;
+  Pl.demoEnd = Pl.demoT0 + (l.mode === 'cchange' ? 8 : Pl.totalBeats) * beat + 0.8;
   Pl.state = 'demo';
   $('#pDemo').lastChild.textContent = 'Стоп';
   $('#pGo').disabled = true;
@@ -868,9 +1054,12 @@ function stopDemo() {
   demoSrc = [];
   $('#pDemo').lastChild.textContent = 'Послушать';
   $('#pGo').disabled = false;
-  if (Pl.state === 'demo') Pl.state = 'idle';
+  if (Pl.state === 'demo') { Pl.state = 'idle'; updateTarget(); }
 }
 
+function hitNote(n, now) {
+  n.st = 'hit'; n.fx = now; Pl.hitFlash = now;
+}
 function judge(now) {
   const l = Pl.lesson;
   if (P.onsetT !== Pl.seenOnset) { Pl.seenOnset = P.onsetT; Pl.wrongCounted = false; }
@@ -879,7 +1068,7 @@ function judge(now) {
     if (!n || P.stable == null) return;
     const fresh = P.onsetT > Pl.armT;
     if (match(P.stable, n.midi) && (fresh || Pl.prevMidi !== n.midi)) {
-      n.st = 'hit'; n.fx = now; Pl.prevMidi = n.midi; Pl.idx++; Pl.armT = now; Pl.hitFlash = now;
+      hitNote(n, now); Pl.prevMidi = n.midi; Pl.idx++; Pl.armT = now;
       updateScore(); updateTarget();
       if (Pl.idx >= Pl.notes.length) setTimeout(finish, 450);
     } else if (fresh && !Pl.wrongCounted && now - P.onsetT > 0.12 && !match(P.stable, n.midi)
@@ -889,13 +1078,31 @@ function judge(now) {
     }
     return;
   }
-  // режим темпа
-  const beat = Pl.beat, WIN = Math.min(0.3, beat * 0.5), LAT = 0.06;
+  if (l.mode === 'cwait' || l.mode === 'cchange') {
+    if (l.mode === 'cchange' && now > Pl.endT) { finish(); return; }
+    const n = Pl.notes[Pl.idx];
+    if (!n) return;
+    const fresh = P.onsetT > Pl.armT, age = now - P.onsetT;
+    if (!fresh || P.chromaN < 2 || age > 0.8) return;
+    if (chordOK(P.chroma, n.chord)) {
+      hitNote(n, now); Pl.idx++; Pl.armT = now;
+      updateScore(); updateTarget();
+      if (l.mode === 'cwait' && Pl.idx >= Pl.notes.length) setTimeout(finish, 450);
+    } else if (l.mode === 'cwait' && !Pl.wrongCounted && age > 0.35 && chScore(P.chroma, n.chord) < 0.5) {
+      Pl.mistakes++; Pl.wrongCounted = true; Pl.missFlash = now; n.wrong = now;
+      updateScore();
+    }
+    return;
+  }
+  // режимы в темпе: ноты и бой
+  const beat = Pl.beat, LAT = 0.06;
+  const WIN = l.mode === 'cstrum' ? Math.min(0.25, beat * 0.25) : Math.min(0.3, beat * 0.5);
   let changed = false;
   Pl.notes.forEach(n => {
     if (n.st === 'pending' && now > Pl.t0 + n.beat * beat + WIN + LAT) { n.st = 'miss'; n.fx = now; changed = true; }
   });
-  if (P.stable != null && P.onsetT > Pl.usedOnset && now - P.onsetT < 0.35) {
+  const ready = l.mode === 'cstrum' ? now - P.onsetT > 0.1 : P.stable != null;
+  if (ready && P.onsetT > Pl.usedOnset && now - P.onsetT < 0.4) {
     const tt = P.onsetT - LAT;
     let best = null, bd = 9;
     Pl.notes.forEach(n => {
@@ -903,72 +1110,112 @@ function judge(now) {
       const dt = Math.abs(Pl.t0 + n.beat * beat - tt);
       if (dt < WIN && dt < bd) { bd = dt; best = n; }
     });
-    if (best && match(P.stable, best.midi)) {
-      best.st = 'hit'; best.fx = now; Pl.usedOnset = P.onsetT; Pl.hitFlash = now; changed = true;
-    } else if (best && now - P.onsetT > 0.12) {
-      best.wrong = now; Pl.usedOnset = P.onsetT; Pl.missFlash = now;
-    }
+    // при бое удар вверх задевает не все струны, поэтому аккорд проверяем мягче
+    const ok = best && (l.mode === 'cstrum'
+      ? P.chromaN === 0 || chScore(P.chroma, best.chord) >= (best.dir === 'U' ? 0.45 : 0.55)
+      : match(P.stable, best.midi));
+    if (ok) { hitNote(best, now); Pl.usedOnset = P.onsetT; changed = true; }
+    else if (best && now - P.onsetT > 0.12) { best.wrong = now; Pl.usedOnset = P.onsetT; Pl.missFlash = now; }
   }
   if (changed) { updateScore(); updateTarget(); }
   if (now > Pl.endT) finish();
 }
 
 function strColor(s) { return COL['s' + s] || COL.accent; }
+function rrect(c, x, y, w, h, r) {
+  c.beginPath(); c.moveTo(x + r, y);
+  c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+}
+function arrow(c, x, y, dir, s, col) {
+  const d = dir === 'D' ? 1 : -1;
+  c.fillStyle = col;
+  c.beginPath(); c.moveTo(x - s, y - d * s * 0.2); c.lineTo(x + s, y - d * s * 0.2); c.lineTo(x, y + d * s * 1.1); c.closePath(); c.fill();
+  c.fillRect(x - s * 0.28, Math.min(y - d * s * 1.4, y - d * s * 0.2), s * 0.56, s * 1.2);
+}
 function drawHighway(now) {
   const {w, h, dpr} = fit(hw), c = hx, l = Pl.lesson;
   c.setTransform(dpr, 0, 0, dpr, 0, 0);
   c.clearRect(0, 0, w, h);
-  const maxS = Math.max(3, ...Pl.notes.map(n => n.s));
-  const top = 26, bot = h - 22, gap = (bot - top) / (maxS - 1);
-  const y = s => top + (s - 1) * gap;
-  const hitX = Math.max(64, w * 0.22);
-  // струны
-  for (let s = 1; s <= maxS; s++) {
-    c.strokeStyle = strColor(s); c.globalAlpha = 0.55; c.lineWidth = 1 + s * 0.45;
-    c.beginPath(); c.moveTo(30, y(s)); c.lineTo(w, y(s)); c.stroke();
-    c.globalAlpha = 1; c.fillStyle = COL.muted; c.font = '600 12px ' + 'JetBrains Mono, monospace';
-    c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(String(s), 14, y(s));
+  const hitX = Math.max(64, w * 0.22), chord = isChord(l);
+  // дорожки: струны для нот, одна линия для аккордов
+  let y = null, gap = 0;
+  if (!chord) {
+    const maxS = Math.max(3, ...Pl.notes.map(n => n.s));
+    const top = 26, bot = h - 22; gap = (bot - top) / (maxS - 1);
+    y = s => top + (s - 1) * gap;
+    for (let s = 1; s <= maxS; s++) {
+      c.strokeStyle = strColor(s); c.globalAlpha = 0.55; c.lineWidth = 1 + s * 0.45;
+      c.beginPath(); c.moveTo(30, y(s)); c.lineTo(w, y(s)); c.stroke();
+      c.globalAlpha = 1; c.fillStyle = COL.muted; c.font = '600 12px JetBrains Mono, monospace';
+      c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(String(s), 14, y(s));
+    }
+  } else {
+    c.strokeStyle = COL.line; c.lineWidth = 2;
+    c.beginPath(); c.moveTo(0, h / 2); c.lineTo(w, h / 2); c.stroke();
   }
   // линия удара
   const flash = Math.max(0, 1 - (now - Pl.hitFlash) / 0.3), mflash = Math.max(0, 1 - (now - Pl.missFlash) / 0.35);
   c.fillStyle = mflash > flash ? COL.miss : COL.accent;
   c.globalAlpha = 0.12 + 0.35 * Math.max(flash, mflash);
   c.fillRect(hitX - 22, 6, 44, h - 12);
-  c.globalAlpha = 1; c.fillStyle = mflash > flash ? COL.miss : COL.accent; c.fillRect(hitX - 1.5, 6, 3, h - 12);
+  c.globalAlpha = 1; c.fillRect(hitX - 1.5, 6, 3, h - 12);
 
-  // позиция нот
-  let xOf, pxBeat;
-  if (l.mode === 'wait') {
-    Pl.scroll += (Pl.idx - Pl.scroll) * 0.18;
-    const sp = Math.min(84, Math.max(60, w / 7));
-    xOf = (n, i) => hitX + (i - Pl.scroll) * sp; pxBeat = 0;
+  // где стоит каждая нота
+  const running = Pl.state === 'run' || Pl.state === 'count' || Pl.state === 'demo';
+  let pos, pxBeat = 0;
+  if (!isTimed(l)) {
+    const sp = chord ? Math.min(110, Math.max(84, w / 5)) : Math.min(84, Math.max(60, w / 7));
+    let cur;
+    if (Pl.state === 'demo') cur = (now - Pl.demoT0) / Pl.demoBeat;
+    else { Pl.scroll += (Pl.idx - Pl.scroll) * 0.18; cur = Pl.scroll; }
+    pos = (n, i) => hitX + (i - cur) * sp;
   } else {
-    pxBeat = Math.max(70, Math.min(110, w / 6));
+    pxBeat = chord ? Math.max(90, Math.min(140, w / 4.5)) : Math.max(70, Math.min(110, w / 6));
     const ref = Pl.state === 'demo' ? Pl.demoT0 : Pl.t0, b = Pl.state === 'demo' ? Pl.demoBeat : Pl.beat;
-    const cur = (Pl.state === 'run' || Pl.state === 'count' || Pl.state === 'demo') ? (now - ref) / b : (Pl.state === 'done' ? Pl.totalBeats + 1 : -2);
-    xOf = n => hitX + (n.beat - cur) * pxBeat;
+    const cur = running ? (now - ref) / b : (Pl.state === 'done' ? Pl.totalBeats + 1 : -2);
+    pos = n => hitX + (n.beat - cur) * pxBeat;
   }
-  if (l.mode === 'wait' && Pl.state === 'demo') {
-    const cur = (now - Pl.demoT0) / Pl.demoBeat;
-    const sp = Math.min(84, Math.max(60, w / 7));
-    xOf = (n, i) => hitX + (i - cur) * sp;
-  }
-  const R = Math.min(17, gap * 0.42 + 6);
+
+  const R = chord ? 0 : Math.min(17, gap * 0.42 + 6);
   Pl.notes.forEach((n, i) => {
-    const x = xOf(n, i), yy = y(n.s);
-    if (x < -40 || x > w + 40) return;
+    const x = pos(n, i);
+    if (x < -60 || x > w + 60) return;
+    let col = chord ? chordColor(n.chord) : strColor(n.s), alpha = 1, k = 1;
+    if (n.st === 'hit') { col = COL.hit; const q = Math.min(1, (now - n.fx) / 0.4); k = 1 + 0.3 * q; alpha = 1 - 0.75 * q; }
+    if (n.st === 'miss') col = COL.line;
+    const wrong = n.wrong && now - n.wrong < 0.4 && n.st === 'pending';
+    if (chord) {
+      const yy = h / 2;
+      if (n.dir) {
+        const prev = Pl.notes[i - 1];
+        if (!prev || prev.chord !== n.chord) {     // начало такта с новым аккордом
+          c.globalAlpha = 1; c.fillStyle = COL.fg; c.font = '700 17px Golos Text, system-ui, sans-serif';
+          c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(n.chord, x, yy - 48);
+          c.strokeStyle = COL.line; c.lineWidth = 1; c.beginPath(); c.moveTo(x - 14, yy - 34); c.lineTo(x - 14, yy + 34); c.stroke();
+        }
+        c.globalAlpha = alpha; arrow(c, x, yy, n.dir, 13 * k, col);
+        if (wrong) { c.strokeStyle = COL.miss; c.lineWidth = 3; c.beginPath(); c.arc(x, yy, 24, 0, Math.PI * 2); c.stroke(); }
+      } else {
+        const cw2 = 72 * k, ch2 = 52 * k;
+        c.globalAlpha = alpha; c.fillStyle = col; rrect(c, x - cw2 / 2, yy - ch2 / 2, cw2, ch2, 12); c.fill();
+        if (wrong) { c.strokeStyle = COL.miss; c.lineWidth = 3; rrect(c, x - cw2 / 2 - 4, yy - ch2 / 2 - 4, cw2 + 8, ch2 + 8, 15); c.stroke(); }
+        c.fillStyle = n.st === 'miss' ? COL.muted : '#fff';
+        c.font = '700 ' + Math.round(22 * k) + 'px Golos Text, system-ui, sans-serif';
+        c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(n.chord, x, yy + 1);
+      }
+      c.globalAlpha = 1;
+      return;
+    }
+    const yy = y(n.s);
     if (pxBeat && n.d > 1) {   // хвост длинной ноты
       c.globalAlpha = n.st === 'miss' ? 0.2 : 0.35; c.fillStyle = strColor(n.s);
       c.fillRect(x, yy - 5, n.d * pxBeat - R - 6, 10); c.globalAlpha = 1;
     }
-    let col = strColor(n.s), alpha = 1, rr = R;
-    if (n.st === 'hit') { col = COL.hit; const k = Math.min(1, (now - n.fx) / 0.4); rr = R * (1 + 0.35 * k); alpha = 1 - 0.75 * k; }
-    if (n.st === 'miss') { col = COL.line; }
+    const rr = R * k;
     c.globalAlpha = alpha;
     c.fillStyle = col; c.beginPath(); c.arc(x, yy, rr, 0, Math.PI * 2); c.fill();
-    if (n.wrong && now - n.wrong < 0.4 && n.st === 'pending') {
-      c.strokeStyle = COL.miss; c.lineWidth = 3; c.beginPath(); c.arc(x, yy, rr + 4, 0, Math.PI * 2); c.stroke();
-    }
+    if (wrong) { c.strokeStyle = COL.miss; c.lineWidth = 3; c.beginPath(); c.arc(x, yy, rr + 4, 0, Math.PI * 2); c.stroke(); }
     c.fillStyle = n.st === 'miss' ? COL.muted : '#fff';
     c.font = '700 ' + Math.round(rr * 0.95) + 'px JetBrains Mono, monospace';
     c.textAlign = 'center'; c.textBaseline = 'middle';
@@ -976,55 +1223,79 @@ function drawHighway(now) {
     c.globalAlpha = 1;
   });
   if (Pl.state === 'idle') {
-    c.fillStyle = COL.muted; c.font = '500 14px Golos Text, system-ui, sans-serif'; c.textAlign = 'center';
-    c.fillText(l.mode === 'wait' ? 'Цифра в кружке — лад, 0 — открытая струна' : 'Нажми «Начать», будет 4 щелчка отсчёта', w / 2 + hitX / 3, h - 9);
+    const hint = {wait:'Цифра в кружке — лад, 0 — открытая струна', cwait:'Зажми аккорд и ударь по струнам',
+      cchange:'Минута: меняй аккорды как можно чаще', cstrum:'↓ удар вниз, ↑ удар вверх'}[l.mode] || 'Нажми «Начать», будет 4 щелчка отсчёта';
+    c.fillStyle = COL.muted; c.font = '500 14px Golos Text, system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'alphabetic';
+    c.fillText(hint, w / 2 + hitX / 3, h - 9);
   }
 }
 function drawFret(now) {
   const {w, h, dpr} = fit(fb), c = fx;
   c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, w, h);
-  const n = Pl.state === 'demo' ? null : currentNote();
+  const n = currentNote();
   const left = 44, right = w - 14, frets = 4, fw = (right - left) / frets;
   const top = 14, bot = h - 14, sg = (bot - top) / 5;
+  const cd = n && n.chord ? CHORDS[n.chord] : null;
+  const ccol = cd ? chordColor(n.chord) : null;
+  const played = s => cd ? cd.frets[6 - s] !== 'x' : n && n.s === s;
   c.fillStyle = COL.fg; c.fillRect(left - 4, top - 4, 5, bot - top + 8);     // порожек
   c.strokeStyle = COL.line; c.lineWidth = 2;
   for (let f = 1; f <= frets; f++) { const x = left + f * fw; c.beginPath(); c.moveTo(x, top - 3); c.lineTo(x, bot + 3); c.stroke(); }
   c.fillStyle = COL.muted; c.font = '500 10px JetBrains Mono, monospace'; c.textAlign = 'center'; c.textBaseline = 'alphabetic';
   for (let f = 1; f <= frets; f++) c.fillText(String(f), left + (f - 0.5) * fw, h - 2);
   for (let s = 1; s <= 6; s++) {
-    const yy = top + (s - 1) * sg;
-    c.strokeStyle = n && n.s === s ? strColor(s) : COL.muted; c.globalAlpha = n && n.s === s ? 1 : 0.4;
+    const yy = top + (s - 1) * sg, on = played(s);
+    c.strokeStyle = on ? (ccol || strColor(s)) : COL.muted; c.globalAlpha = on ? 1 : 0.4;
     c.lineWidth = 0.8 + s * 0.35; c.beginPath(); c.moveTo(left, yy); c.lineTo(right, yy); c.stroke(); c.globalAlpha = 1;
   }
   if (!n) return;
-  const yy = top + (n.s - 1) * sg;
-  if (n.f === 0) {
-    c.strokeStyle = strColor(n.s); c.lineWidth = 2.5; c.beginPath(); c.arc(22, yy, 8, 0, Math.PI * 2); c.stroke();
-  } else {
-    const x = left + (n.f - 0.5) * fw;
-    c.fillStyle = strColor(n.s); c.beginPath(); c.arc(x, yy, 10, 0, Math.PI * 2); c.fill();
-    c.fillStyle = '#fff'; c.font = '700 11px JetBrains Mono, monospace'; c.textAlign = 'center'; c.textBaseline = 'middle';
-    c.fillText(String(n.f), x, yy + 0.5);
-  }
+  const marks = cd
+    ? [1, 2, 3, 4, 5, 6].map(s => ({s, f:cd.frets[6 - s], fg:cd.fing[6 - s], col:ccol}))
+    : [{s:n.s, f:String(n.f), fg:String(n.f), col:strColor(n.s)}];
+  marks.forEach(m => {
+    const yy = top + (m.s - 1) * sg;
+    if (m.f === 'x') {
+      c.strokeStyle = COL.muted; c.lineWidth = 2; c.beginPath();
+      c.moveTo(16, yy - 5); c.lineTo(26, yy + 5); c.moveTo(26, yy - 5); c.lineTo(16, yy + 5); c.stroke();
+    } else if (m.f === '0') {
+      c.strokeStyle = m.col; c.lineWidth = 2.5; c.beginPath(); c.arc(21, yy, 6, 0, Math.PI * 2); c.stroke();
+    } else {
+      const x = left + (Number(m.f) - 0.5) * fw;
+      c.fillStyle = m.col; c.beginPath(); c.arc(x, yy, Math.min(10, sg * 0.55), 0, Math.PI * 2); c.fill();
+      c.fillStyle = '#fff'; c.font = '700 11px JetBrains Mono, monospace'; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillText(m.fg, x, yy + 0.5);
+    }
+  });
 }
 function playerFrame(now) {
   if (Pl.state === 'count') {
     const k = Math.floor((now - Pl.countStart) / Pl.beat);
-    if (now >= Pl.t0 - 0.05) { Pl.state = 'run'; $('#pCount').hidden = true; }
-    else { $('#pCount').hidden = false; $('#pCount').textContent = String(Math.max(1, 4 - Math.max(0, k))); }
+    if (now >= Pl.t0 - 0.05) {
+      Pl.state = 'run'; $('#pCount').hidden = true;
+      if (Pl.lesson.mode === 'cchange') { Pl.armT = now; Pl.usedOnset = P.onsetT; }
+    } else { $('#pCount').hidden = false; $('#pCount').textContent = String(Math.max(1, Pl.countN - Math.max(0, k))); }
   }
   if (Pl.state === 'demo' && now > Pl.demoEnd) stopDemo();
   if (Pl.state === 'run') judge(now);
+  if (Pl.lesson.mode === 'cchange' && Pl.state === 'run') updateScore();
   // что слышит микрофон
   const lvl = A.on ? Math.min(1, P.rms / (gate() * 8)) : 0;
   $('#pMeter').style.width = (lvl * 100).toFixed(0) + '%';
   const hear = $('#pHear'), tgt = currentNote();
-  if (!A.on) { hear.textContent = 'микрофон выкл.'; hear.className = 'hear-n'; }
-  else if (P.stable == null) { hear.textContent = 'тишина'; hear.className = 'hear-n'; }
-  else {
-    hear.textContent = 'слышу ' + ruName(P.stable);
-    hear.className = 'hear-n ' + (tgt && match(P.stable, tgt.midi) ? 'good' : 'bad');
+  let txt = 'тишина', cls = 'hear-n';
+  if (!A.on) txt = 'микрофон выкл.';
+  else if (isChord(Pl.lesson)) {
+    if (P.chLiveOn) {
+      const b = chBest(P.chLive);
+      txt = b.score > 0.55 ? 'слышу ' + b.name : 'неразборчиво';
+      if (b.score > 0.55) cls += tgt && b.name === tgt.chord ? ' good' : ' bad';
+    }
+  } else if (P.stable != null) {
+    txt = 'слышу ' + ruName(P.stable);
+    cls += tgt && tgt.midi != null && match(P.stable, tgt.midi) ? ' good' : ' bad';
   }
+  if (hear.textContent !== txt) hear.textContent = txt;
+  if (hear.className !== cls) hear.className = cls;
   drawHighway(now); drawFret(now);
 }
 $('#pBack').addEventListener('click', closeLesson);
